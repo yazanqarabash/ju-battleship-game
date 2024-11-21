@@ -1,3 +1,4 @@
+/*
 package com.ju.battleshipgame.ui.home
 
 import androidx.compose.foundation.Image
@@ -71,3 +72,4 @@ fun Homescreen(
         }
     }
 }
+*/
