@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "809572285481",
+    "project_id": "ju-battleship",
+    "storage_bucket": "ju-battleship.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:809572285481:android:61c63e0bff93a3875df038",
+        "android_client_info": {
+          "package_name": "com.ju.battleshipgame"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAISgxRO89srAu4gKHIO-bQVpBqSKM3R9c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
