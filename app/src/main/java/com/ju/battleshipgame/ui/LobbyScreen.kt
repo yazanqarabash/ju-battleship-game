@@ -1,4 +1,4 @@
-package com.ju.battleshipgame.ui.lobby
+package com.ju.battleshipgame.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
