@@ -1,7 +1,13 @@
 package com.ju.battleshipgame.models
 
 data class Player(
-    val id: String = "",
     var name: String = "",
-    var invitation: String = ""
+    var challengeState: ChallengeState,
+    var isReady: Boolean
 )
+
+enum class ChallengeState {
+    IDLE,
+    ACCEPT,
+    DECLINE
+}
