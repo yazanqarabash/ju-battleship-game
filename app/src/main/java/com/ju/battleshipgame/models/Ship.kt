@@ -4,7 +4,7 @@ data class Ship(
     val idByShipType: ShipType,
     val length: Int,
     var cells: List<Cell>,
-    val orientation: Orientation,
+    var orientation: Orientation,
     var isSunk: Boolean = false
 )
 
@@ -21,7 +21,5 @@ enum class Orientation {
     VERTICAL,
     HORIZONTAL;
 
-    fun isVertical() = this == VERTICAL
-    fun isHorizontal() = this == HORIZONTAL
     fun opposite() = if (this == VERTICAL) HORIZONTAL else VERTICAL
 }
