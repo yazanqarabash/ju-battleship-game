@@ -30,6 +30,22 @@ fun calculateShipPlacement(
     return cells
 }
 
+fun updateShipIfValid(
+    ship: Ship,
+    newCells: List<Cell>?,
+    newOrientation: Orientation,
+    ships: List<Ship>
+): List<Ship> {
+    return if (newCells != null && !isOverlapping(newCells, ships, ship)) {
+        val updatedShip = ship.copy(
+            orientation = newOrientation,
+            cells = newCells
+        )
+        ships.map { if (it == ship) updatedShip else it }
+    } else {
+        ships
+    }
+}
 
 fun isOverlapping(newCells: List<Cell>, ships: List<Ship>, currentShip: Ship): Boolean {
     return ships.any { ship ->

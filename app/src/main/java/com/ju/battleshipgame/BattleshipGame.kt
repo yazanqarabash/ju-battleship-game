@@ -1,16 +1,13 @@
 package com.ju.battleshipgame
 
 import androidx.compose.runtime.Composable
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.ju.battleshipgame.ui.BoardSetupScreen
-import com.ju.battleshipgame.ui.LobbyScreen
+import com.ju.battleshipgame.ui.setup.SetupScreen
 
 @Composable
 fun TestBoardSetupScreen() {
     val mockViewModel = MockGameViewModel()
-    BoardSetupScreen(
+    SetupScreen(
         navController = rememberNavController(),
         gameId = "game1",
         model = mockViewModel

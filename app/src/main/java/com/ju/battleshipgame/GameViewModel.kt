@@ -1,13 +1,15 @@
 package com.ju.battleshipgame
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
-import com.ju.battleshipgame.models.Board
 import com.ju.battleshipgame.models.Cell
 import com.ju.battleshipgame.models.ChallengeState
 import com.ju.battleshipgame.models.Coordinate
+import com.ju.battleshipgame.models.DEFAULT_PLAYER_SHIPS
 import com.ju.battleshipgame.models.Game
 import com.ju.battleshipgame.models.GamePLayer
 import com.ju.battleshipgame.models.GameState
@@ -74,76 +76,12 @@ val mockGame = Game(
     players = listOf(
         GamePLayer(
             player = mockPlayers["player1"]!!,
-            playerBoard = Board(size = 10),
-            playerShips = listOf(
-                Ship(
-                    ShipType.CARRIER, 4,
-                    cells = calculateShipPlacement(Coordinate('A', 1), 4, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.CRUISER, 3,
-                    cells = calculateShipPlacement(Coordinate('C', 3), 3, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('E', 5), 2, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('H', 2), 2, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.SUBMARINE, 1,
-                    cells = calculateShipPlacement(Coordinate('J', 8), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.DESTROYER, 1,
-                    cells = calculateShipPlacement(Coordinate('F', 7), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                )
-            ),
+            playerShips = DEFAULT_PLAYER_SHIPS,
             isReady = false
         ),
         GamePLayer(
             player = mockPlayers["player2"]!!,
-            playerBoard = Board(size = 10),
-            playerShips = listOf(
-                Ship(
-                    ShipType.CARRIER, 4,
-                    cells = calculateShipPlacement(Coordinate('A', 1), 4, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.CRUISER, 3,
-                    cells = calculateShipPlacement(Coordinate('C', 3), 3, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('E', 5), 2, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('H', 2), 2, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.SUBMARINE, 1,
-                    cells = calculateShipPlacement(Coordinate('J', 8), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.DESTROYER, 1,
-                    cells = calculateShipPlacement(Coordinate('F', 7), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                )
-            ),
+            playerShips = DEFAULT_PLAYER_SHIPS,
             isReady = false
         )
     ),

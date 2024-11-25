@@ -9,7 +9,6 @@ data class Game(
 
 data class GamePLayer(
     val player: Player,
-    val playerBoard: Board,
     val playerShips: List<Ship>,
     var isReady: Boolean
 )
