@@ -1,18 +1,11 @@
 package com.ju.battleshipgame
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.ju.battleshipgame.ui.GameScreen
 import com.ju.battleshipgame.ui.setup.SetupScreen
-
-@Composable
-fun TestBoardSetupScreen() {
-    val mockViewModel = MockGameViewModel()
-    SetupScreen(
-        navController = rememberNavController(),
-        gameId = "game1",
-        model = mockViewModel
-    )
-}
 
 @Composable
 fun BattleshipGame() {
@@ -20,24 +13,25 @@ fun BattleshipGame() {
     val model = GameViewModel()
     model.initGame()
 
+    // TODO remove hardcoded routes
 
-/*    NavHost(
+    NavHost(
         navController = navController,
-        startDestination = "player"
+        startDestination = "boardSetup/game1"
     ) {
-        composable("player") { NewPlayerScreen(navController, model) }
-        composable("lobby") { LobbyScreen(navController, model) }
+        //composable("player") { NewPlayerScreen(navController, model) }
+        //composable("lobby") { LobbyScreen(navController, model) }
         composable("boardSetup/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId")
-            BoardSetupScreen(
+            SetupScreen(
                 navController = navController,
-                gameId = gameId,
+                gameId = "game1",
                 model = model
             )
         }
         composable("game/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId")
-            GameScreen(navController, model, gameId)
+            GameScreen(navController, gameId, model)
         }
-    }*/
+    }
 }

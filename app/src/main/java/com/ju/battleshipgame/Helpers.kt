@@ -17,8 +17,9 @@ fun calculateShipPlacement(
     for (i in 0 until length) {
         val cell = when (orientation) {
             Orientation.HORIZONTAL -> {
-                if (start.col + i > 'A' + gridSize - 1) return null
-                Cell(Coordinate((start.col + i), start.row), false)
+                val colChar = (start.col[0] + i)
+                if (colChar > 'A' + gridSize - 1) return null
+                Cell(Coordinate(colChar.toString(), start.row), false)
             }
             Orientation.VERTICAL -> {
                 if (start.row + i > gridSize) return null
@@ -55,14 +56,23 @@ fun calculatePotentialCells(
 ): List<Coordinate> {
     if (ship == null) return emptyList()
 
-    val startCol = draggedCoordinate.col
-    val startRow = draggedCoordinate.row
-
     return (0 until ship.length).mapNotNull { offset ->
-        val col = if (ship.orientation == Orientation.HORIZONTAL) startCol + offset else startCol
-        val row = if (ship.orientation == Orientation.VERTICAL) startRow + offset else startRow
+        val colChar = if (ship.orientation == Orientation.HORIZONTAL) {
+            (draggedCoordinate.col[0] + offset)
+        } else {
+            draggedCoordinate.col[0]
+        }
+        val row = if (ship.orientation == Orientation.VERTICAL) {
+            draggedCoordinate.row + offset
+        } else {
+            draggedCoordinate.row
+        }
 
-        if (col in 'A' until 'A' + gridSize && row in 1..gridSize) Coordinate(col, row) else null
+        if (colChar in 'A'..<'A' + gridSize && row in 1..gridSize) {
+            Coordinate(colChar.toString(), row)
+        } else {
+            null
+        }
     }
 }
 
@@ -72,7 +82,7 @@ fun calculateOccupyingShipOffset(
     cellSizePx: Float
 ): Offset {
     val cellIndexInShip = when (ship.orientation) {
-        Orientation.HORIZONTAL -> draggedCoordinate.col - ship.cells.first().coordinate.col
+        Orientation.HORIZONTAL -> draggedCoordinate.col[0] - ship.cells.first().coordinate.col[0]
         Orientation.VERTICAL -> draggedCoordinate.row - ship.cells.first().coordinate.row
     }
 
