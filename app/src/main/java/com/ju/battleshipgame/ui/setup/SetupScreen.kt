@@ -35,24 +35,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.ju.battleshipgame.MockGameViewModel
+import com.ju.battleshipgame.calculateOccupyingShipOffset
+import com.ju.battleshipgame.calculatePotentialCells
 import com.ju.battleshipgame.calculateShipPlacement
-import com.ju.battleshipgame.isOverlapping
 import com.ju.battleshipgame.models.Coordinate
 import com.ju.battleshipgame.models.DragState
 import com.ju.battleshipgame.models.GameState
-import com.ju.battleshipgame.models.Orientation
 import com.ju.battleshipgame.models.Ship
 import com.ju.battleshipgame.updateShipIfValid
 import kotlinx.coroutines.flow.asStateFlow
+
+private const val GRID_SIZE = 10
+private val CELL_SIZE_DP = 32.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,23 +148,19 @@ fun SetupScreen(
             Text(text = "Arrange Your Ships")
             Spacer(modifier = Modifier.height(12.dp))
             Box(modifier = Modifier.size(320.dp)) {
-                val gridSize = 10
-                val cellSizeDp = 32.dp
                 val dragMutableState = remember { mutableStateOf(DragState()) }
 
-                Box(modifier = Modifier.size(cellSizeDp * gridSize)) {
+                Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(gridSize),
+                        columns = GridCells.Fixed(GRID_SIZE),
                         modifier = Modifier.matchParentSize()
                     ) {
-                        itemsIndexed((1..gridSize).flatMap { row -> ('A' until 'A' + gridSize).map { col -> Coordinate(col, row) } }) { _, coordinate ->
+                        itemsIndexed((1..GRID_SIZE).flatMap { row -> ('A' until 'A' + GRID_SIZE).map { col -> Coordinate(col, row) } }) { _, coordinate ->
                             val occupyingShip = ships.find { ship -> ship.cells.any { it.coordinate == coordinate } }
 
                             GridCell(
-                                cellSizeDp,
                                 occupyingShip,
                                 coordinate,
-                                gridSize,
                                 onShipMoved,
                                 onShipClicked,
                                 dragMutableState
@@ -185,43 +182,19 @@ fun SetupScreen(
 
 @Composable
 fun GridCell(
-    cellSizeDp: Dp,
     occupyingShip: Ship?,
     coordinate: Coordinate,
-    gridSize: Int,
     onShipMoved: (Ship, Coordinate) -> Unit,
     onShipClicked: (Ship) -> Unit,
     dragMutableState: MutableState<DragState>
 ) {
     var dragState by dragMutableState
-    val cellSizePx = with(LocalDensity.current) { cellSizeDp.toPx() }
+    val cellSizePx = with(LocalDensity.current) { CELL_SIZE_DP.toPx() }
     val isHighlighted = dragState.potentialCells.contains(coordinate)
-
-    fun calculatePotentialCells(
-        ship: Ship?,
-        draggedCoordinate: Coordinate,
-        gridSize: Int
-    ): List<Coordinate> {
-        if (ship == null) return emptyList()
-
-        val startCol = draggedCoordinate.col
-        val startRow = draggedCoordinate.row
-
-        return (0 until ship.length).mapNotNull { offset ->
-            val col = if (ship.orientation == Orientation.HORIZONTAL) startCol + offset else startCol
-            val row = if (ship.orientation == Orientation.VERTICAL) startRow + offset else startRow
-
-            if (col in 'A' until 'A' + gridSize && row in 1..gridSize) {
-                Coordinate(col, row)
-            } else {
-                null
-            }
-        }
-    }
 
     Box(
         modifier = Modifier
-            .size(cellSizeDp)
+            .size(CELL_SIZE_DP)
             .background(if (occupyingShip != null) Color.Blue else Color.White)
             .border(
                 width = if (isHighlighted) 3.dp else 1.dp,
@@ -234,16 +207,17 @@ fun GridCell(
             )
             .pointerInput(occupyingShip) {
                 detectDragGestures(
-                    onDragStart = {
+                    onDragStart = { touchPosition ->
                         if (occupyingShip != null) {
+                            val initialOffset = calculateOccupyingShipOffset(occupyingShip, coordinate.offset(touchPosition, cellSizePx), cellSizePx)
+
                             dragState = dragState.copy(
                                 ship = occupyingShip,
-                                isPlaced = true,
-                                dragOffset = Offset.Zero,
+                                dragOffset = initialOffset,
                                 potentialCells = calculatePotentialCells(
                                     occupyingShip,
                                     coordinate,
-                                    gridSize
+                                    GRID_SIZE
                                 )
                             )
                         }
@@ -253,8 +227,8 @@ fun GridCell(
                             val deltaCol = (dragState.dragOffset.x / cellSizePx).toInt()
                             val deltaRow = (dragState.dragOffset.y / cellSizePx).toInt()
                             val newCoordinate = Coordinate(
-                                (coordinate.col + deltaCol).coerceIn('A', 'A' + gridSize - 1),
-                                (coordinate.row + deltaRow).coerceIn(1, gridSize)
+                                (coordinate.col + deltaCol).coerceIn('A', 'A' + GRID_SIZE - 1),
+                                (coordinate.row + deltaRow).coerceIn(1, GRID_SIZE)
                             )
                             onShipMoved(dragState.ship!!, newCoordinate)
                             dragState = dragState.reset()
@@ -270,7 +244,7 @@ fun GridCell(
                         potentialCells = calculatePotentialCells(
                             dragState.ship,
                             coordinate.offset(dragState.dragOffset + dragAmount, cellSizePx),
-                            gridSize
+                            GRID_SIZE
                         )
                     )
                 }
