@@ -14,7 +14,6 @@ data class GamePLayer(
 )
 
 enum class GameState {
-    WAITING_FOR_PLAYERS,
     SETTING_SHIPS,
     GAME_IN_PROGRESS,
     FINISHED,
