@@ -1,25 +1,20 @@
 package com.ju.battleshipgame
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
-import com.ju.battleshipgame.models.Board
-import com.ju.battleshipgame.models.Cell
-import com.ju.battleshipgame.models.ChallengeState
-import com.ju.battleshipgame.models.Coordinate
 import com.ju.battleshipgame.models.Game
-import com.ju.battleshipgame.models.GamePLayer
 import com.ju.battleshipgame.models.GameState
-import com.ju.battleshipgame.models.Orientation
 import com.ju.battleshipgame.models.Player
 import com.ju.battleshipgame.models.Ship
-import com.ju.battleshipgame.models.ShipType
 import kotlinx.coroutines.flow.MutableStateFlow
 
 open class GameViewModel: ViewModel() {
     val db = Firebase.firestore
-    var localPlayerId = mutableStateOf<String?>(null)
+    // TODO take localPlayerId from sharedpreferences
+    var localPlayerId = mutableStateOf<String?>("Bob")
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
 
@@ -52,113 +47,69 @@ open class GameViewModel: ViewModel() {
             }
     }
 
-    fun updateGameState(gameId: String?, newState: GameState) {
-        if (gameId == null) return
-        val game = gameMap.value[gameId] ?: return
+    fun updateGameState(gameId: String, newState: GameState) {
         db.collection("games").document(gameId).update("gameState", newState)
     }
-}
 
-val mockPlayers = mapOf(
-    "player1" to Player(
-        name = "Alice",
-        challengeState = ChallengeState.ACCEPT,
-    ),
-    "player2" to Player(
-        name = "Bob",
-        challengeState = ChallengeState.ACCEPT,
-    )
-)
+    fun updateCurrentPlayer(gameId: String, newState: String) {
+        db.collection("games").document(gameId).update("currentPlayer", newState)
+    }
 
-val mockGame = Game(
-    players = listOf(
-        GamePLayer(
-            player = mockPlayers["player1"]!!,
-            playerBoard = Board(size = 10),
-            playerShips = listOf(
-                Ship(
-                    ShipType.CARRIER, 4,
-                    cells = calculateShipPlacement(Coordinate('A', 1), 4, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.CRUISER, 3,
-                    cells = calculateShipPlacement(Coordinate('C', 3), 3, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('E', 5), 2, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('H', 2), 2, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.SUBMARINE, 1,
-                    cells = calculateShipPlacement(Coordinate('J', 8), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.DESTROYER, 1,
-                    cells = calculateShipPlacement(Coordinate('F', 7), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                )
-            ),
-            isReady = false
-        ),
-        GamePLayer(
-            player = mockPlayers["player2"]!!,
-            playerBoard = Board(size = 10),
-            playerShips = listOf(
-                Ship(
-                    ShipType.CARRIER, 4,
-                    cells = calculateShipPlacement(Coordinate('A', 1), 4, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.CRUISER, 3,
-                    cells = calculateShipPlacement(Coordinate('C', 3), 3, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('E', 5), 2, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.BATTLESHIP, 2,
-                    cells = calculateShipPlacement(Coordinate('H', 2), 2, Orientation.VERTICAL)!!,
-                    orientation = Orientation.VERTICAL
-                ),
-                Ship(
-                    ShipType.SUBMARINE, 1,
-                    cells = calculateShipPlacement(Coordinate('J', 8), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                ),
-                Ship(
-                    ShipType.DESTROYER, 1,
-                    cells = calculateShipPlacement(Coordinate('F', 7), 1, Orientation.HORIZONTAL)!!,
-                    orientation = Orientation.HORIZONTAL
-                )
-            ),
-            isReady = false
-        )
-    ),
-    currentPlayer = "player1",
-    winner = null,
-    gameState = GameState.SETTING_SHIPS
-)
+    fun updatePlayerReadyState(gameId: String, playerName: String, ships: List<Ship>, isReady: Boolean) {
+        val game = gameMap.value[gameId] ?: return
+        val updatedPlayers = game.players.map {
+            if (it.player.name == playerName) {
+                it.copy(playerShips = ships, isReady = isReady)
+            } else {
+                it
+            }
+        }
 
+        db.collection("games").document(gameId)
+            .update("players", updatedPlayers)
+            .addOnSuccessListener {
+                Log.d("GameViewModel", "Player readiness updated successfully")
+            }
+            .addOnFailureListener { e ->
+                Log.e("GameViewModel", "Error updating readiness: ${e.message}")
+            }
+    }
 
-class MockGameViewModel : GameViewModel() {
-    init {
-        // Add mock game
-        gameMap.value = mapOf("game1" to mockGame)
+    // TODO test if leaving game is working properly
+    fun removePlayerAndCheckGameDeletion(gameId: String, playerName: String?) {
+        val game = gameMap.value[gameId] ?: return
 
-        // Set local player ID for testing
-        localPlayerId.value = "Alice"
+        val remainingPlayers = game.players.filter { it.player.name != playerName }
+
+        if (remainingPlayers.isEmpty()) {
+            db.collection("games").document(gameId)
+                .delete()
+                .addOnSuccessListener {
+                    Log.d("GameViewModel", "Game deleted successfully")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("GameViewModel", "Error deleting game: ${e.message}")
+                }
+        } else {
+            if (game.gameState == GameState.SETTING_SHIPS) {
+                db.collection("games").document(gameId)
+                    .update("gameState", GameState.CANCELED)
+                    .addOnSuccessListener {
+                        Log.d("GameViewModel", "Game marked as canceled")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("GameViewModel", "Error updating game state: ${e.message}")
+                    }
+            }
+
+            db.collection("games").document(gameId)
+                .update("players", remainingPlayers)
+                .addOnSuccessListener {
+                    Log.d("GameViewModel", "Player removed successfully")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("GameViewModel", "Error removing player: ${e.message}")
+                }
+        }
     }
 }
