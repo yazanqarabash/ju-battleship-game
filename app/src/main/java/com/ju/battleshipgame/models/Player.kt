@@ -1,12 +1,7 @@
 package com.ju.battleshipgame.models
 
 data class Player(
-    var name: String = "",
-    var challengeState: ChallengeState? = null,
+
+    var name: String = ""
 )
 
-enum class ChallengeState {
-    IDLE,
-    ACCEPT,
-    DECLINE
-}

@@ -3,8 +3,10 @@ package com.ju.battleshipgame.models
 data class Game(
     val players: List<GamePLayer> = emptyList(),
     var currentPlayer: String = "",
+    var player1Id: String = "",
+    var player2Id: String = "",
     var winner: Player? = null,
-    var gameState: GameState = GameState.WAITING_FOR_PLAYERS,
+    var gameState: String = GameState.SETTING_SHIPS.toString(),
 )
 
 data class GamePLayer(
@@ -17,5 +19,6 @@ enum class GameState {
     SETTING_SHIPS,
     GAME_IN_PROGRESS,
     FINISHED,
-    CANCELED
+    CANCELED,
+    Invite
 }

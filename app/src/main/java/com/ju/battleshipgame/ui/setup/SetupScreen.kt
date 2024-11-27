@@ -110,7 +110,7 @@ fun SetupScreen(
             model.updateCurrentPlayer(gameId, gamePlayer.player.name)
             navController.navigate("game/$gameId")
         }
-        if (game.gameState == GameState.CANCELED) {
+        if (game.gameState == GameState.CANCELED.toString()) {
             navController.navigate("lobby")
         }
     }
@@ -190,8 +190,8 @@ fun SetupScreen(
                 Text(text = "Leave game")
             }
             when (game.gameState) {
-                GameState.CANCELED -> Text("Game has been canceled. Returning to lobby...")
-                GameState.SETTING_SHIPS -> {
+                GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby...")
+                GameState.SETTING_SHIPS.toString() -> {
                     when {
                         gamePlayer.isReady && opponent.isReady -> Text("Game is starting!")
                         gamePlayer.isReady -> Text("Waiting for opponent to be ready...")

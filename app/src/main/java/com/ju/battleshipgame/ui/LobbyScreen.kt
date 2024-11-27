@@ -1,111 +1,94 @@
-package com.ju.battleshipgame.ui
-
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import android.util.Log
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.ju.battleshipgame.R
-import com.ju.battleshipgame.models.Player
+import com.ju.battleshipgame.GameViewModel
+import com.ju.battleshipgame.models.Game
+import kotlinx.coroutines.flow.asStateFlow
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LobbyScreen(
-    players: MutableList<Player>,
-    navController: NavController,
-    modifier: Modifier = Modifier
-) {
-    ListView(players = players, navController = navController, modifier = modifier.fillMaxSize())
-}
+fun LobbyScreen(navController: NavController, model: GameViewModel) {
+    val players by model.playerMap.asStateFlow().collectAsStateWithLifecycle()
+    val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
 
-@Composable
-fun ListView(players: MutableList<Player>, navController: NavController, modifier: Modifier) {
-    Box( modifier=Modifier.fillMaxSize()){
-        Image(
-            painter = painterResource(id= R.drawable.battleship_lobby),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Top
-        ) {
-            items(players) { player ->
-                RowView(player = player, navController = navController)
-                Spacer(modifier = Modifier.height(13.dp))
-                HorizontalDivider(color = Color.Gray, thickness = 1.dp)
+    LaunchedEffect(games) {
+        games.forEach { (gameId, game) ->
+            if ((game.player1Id == model.localPlayerId.value || game.player2Id == model.localPlayerId.value)
+                && game.gameState == "player1_turn") {
+                navController.navigate("game/$gameId")
             }
         }
     }
-        Button(onClick = {
-            navController.popBackStack()
-        },modifier=Modifier.fillMaxWidth(0.5f).padding(16.dp).align( Alignment.BottomCenter)
-        ) {
-            Text("Change Name")
-
-        }
+    var playerName = "Unknown?"
+    players[model.localPlayerId.value]?.let {
+        playerName = it.name
     }
-}
 
-@Composable
-fun RowView(player: Player, navController: NavController) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+    Scaffold(
+        topBar = { TopAppBar(title =  { Text("Battelships - $playerName")}) }
+    ) { innerPadding ->
+        LazyColumn(modifier = Modifier.padding(innerPadding)) {
+            items(players.entries.toList()) { (documentId, player) ->
+                if (documentId != model.localPlayerId.value) {
+                    ListItem(
+                        headlineContent = {
+                            Text("Player Name: ${player.name}")
+                        },
+                        supportingContent = {
+                            Text("Status: ...")
+                        },
+                        trailingContent = {
+                            var hasGame = false
+                            games.forEach { (gameId, game) ->
+                                if (game.player1Id == model.localPlayerId.value && game.player2Id == documentId && game.gameState == "invite") {
+                                    Text("Waiting for accept...")
+                                    hasGame = true
+                                } else if (game.player2Id == model.localPlayerId.value && game.player1Id == documentId && game.gameState == "invite") {
+                                    Button(onClick = {
+                                        model.db.collection("games").document(gameId)
+                                            .update("gameState", "player1_turn")
+                                            .addOnSuccessListener {
+                                                navController.navigate("game/$gameId")
+                                            }
+                                            .addOnFailureListener {
+                                                Log.e("LobbyScreen", "Error updating game: $gameId")
+                                            }
+                                    }) {
+                                        Text("Accept invite")
+                                    }
+                                    hasGame = true
+                                }
+                            }
+                            if (!hasGame) {
+                                Button(onClick = {
+                                    model.db.collection("games")
+                                        .add(Game(gameState = "invite", player1Id = model.localPlayerId.value!!, player2Id = documentId))
+                                        .addOnSuccessListener { documentRef ->
+                                            Log.d("LobbyScreen", "Game created: ${documentRef.id}")
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Log.e("LobbyScreen", "Error creating game: ${e.message}")
+                                        }
+                                }) {
+                                    Text("Challenge")
+                                }
+                            }
+                        }
 
-    ) {
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-            .background(Color.Black.copy(alpha = 0.5f))
-            .padding(8.dp)
-        ) {
-            Text(
-                text = player.name,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(end = 8.dp),
-                color = Color.White,
-                style = androidx.compose.ui.text.TextStyle(fontSize = 18.sp)
-            )
-            Button(
-                onClick = {},
-                modifier = Modifier
-                    .size(width = 100.dp, height = 40.dp)
-                    .align(Alignment.CenterEnd)
-
-            ) {
-                Text("Challenge")
+                    )
+                }
             }
         }
-
     }
 }
