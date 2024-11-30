@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 open class GameViewModel: ViewModel() {
     val db = Firebase.firestore
     // TODO take localPlayerId from sharedpreferences
-    var localPlayerId = mutableStateOf<String?>("Bob")
+    var localPlayerId = mutableStateOf<String?>(null)
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
     val inviteMap =  MutableStateFlow<Map<String, Invite>>(emptyMap())
@@ -79,26 +79,30 @@ open class GameViewModel: ViewModel() {
         db.collection("games").document(gameId).update("currentPlayer", newState)
     }
 
-    fun updatePlayerReadyState(gameId: String, playerName: String, ships: List<Ship>, isReady: Boolean) {
-        val game = gameMap.value[gameId] ?: return
-        val updatedPlayers = game.players.map {
-            if (it.player.name == playerName) {
-                it.copy(playerShips = ships, isReady = isReady)
-            } else {
-                it
-            }
-        }
-
-        db.collection("games").document(gameId)
-            .update("players", updatedPlayers)
-            .addOnSuccessListener {
-                Log.d("GameViewModel", "Player readiness updated successfully")
+    fun updatePlayerReadyState(gameId: String, playerId: String, ships: List<Ship>, isReady: Boolean) {
+        db.collection("games").document(gameId).get()
+            .addOnSuccessListener { document ->
+                val game = document.toObject(Game::class.java)
+                game?.let {
+                    val updatedPlayers = it.players.map { player ->
+                        if (player.playerId == playerId) {
+                            player.copy(playerShips = ships, isReady = isReady)
+                        } else player
+                    }
+                    db.collection("games").document(gameId)
+                        .update("players", updatedPlayers)
+                        .addOnSuccessListener {
+                            Log.d("FirebaseUpdate", "Player state updated: $playerId")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("FirebaseUpdate", "Failed to update player state: ${e.message}")
+                        }
+                }
             }
             .addOnFailureListener { e ->
-                Log.e("GameViewModel", "Error updating readiness: ${e.message}")
+                Log.e("FirebaseFetch", "Failed to fetch game: ${e.message}")
             }
     }
-
     // TODO test if leaving game is working properly
     fun removePlayerAndCheckGameDeletion(gameId: String, playerName: String?) {
         val game = gameMap.value[gameId] ?: return

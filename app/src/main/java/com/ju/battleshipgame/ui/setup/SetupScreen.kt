@@ -52,6 +52,7 @@ import com.ju.battleshipgame.models.Ship
 import com.ju.battleshipgame.updateShipIfValid
 import kotlinx.coroutines.flow.asStateFlow
 
+
 private const val GRID_SIZE = 10
 private val CELL_SIZE_DP = 32.dp
 
@@ -67,37 +68,25 @@ fun SetupScreen(
 
     val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
 
-    // TODO error composables need fix layout
-
     if (gameId == null || !games.containsKey(gameId)) {
-        Log.e(
-            "SetupError",
-            "Error: Game not found: $gameId"
-        )
+        Log.e("SetupError", "Error: Game not found: $gameId")
         Text("Error: Game not found: $gameId")
         Spacer(Modifier.height(12.dp))
-        IconButton(
-            onClick = { navController.navigate("lobby") }
-        ) {
+        IconButton(onClick = { navController.navigate("lobby") }) {
             Icon(Icons.Filled.Clear, contentDescription = "Leave")
         }
         return
     }
 
     val game = games[gameId]!!
-    val gamePlayer = game.players.find { it.player.name == model.localPlayerId.value }
-    val opponent = game.players.find { it.player.name != model.localPlayerId.value }
+    val gamePlayer = game.players.find { it.playerId == model.localPlayerId.value }
+    val opponent = game.players.find { it.playerId != model.localPlayerId.value }
 
     if (gamePlayer == null || opponent == null) {
-        Log.e(
-            "SetupError",
-            "Error: Player not found!"
-        )
-        Text(text = "Error: Player not found!")
+        Log.e("SetupError", "Error: Player not found!")
+        Text("Error: Player not found!")
         Spacer(Modifier.height(12.dp))
-        IconButton(
-            onClick = { navController.navigate("lobby") }
-        ) {
+        IconButton(onClick = { navController.navigate("lobby") }) {
             Icon(Icons.Filled.Clear, contentDescription = "Leave")
         }
         return
@@ -106,8 +95,14 @@ fun SetupScreen(
     LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
         if (gamePlayer.isReady && opponent.isReady) {
             model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
-            // TODO fix so that one who did invite starts playing
-            model.updateCurrentPlayer(gameId, gamePlayer.player.name)
+
+            // Uppdatera currentPlayerId så den som bjudit in spelet får börja spela
+            val firstPlayer = game.players.firstOrNull { it.player.name == model.localPlayerId.value }
+            if (firstPlayer != null) {
+                model.updateCurrentPlayer(gameId, firstPlayer.player.name)
+                Log.d("SetupScreen", "First player set to: ${firstPlayer.player.name}")
+            }
+
             navController.navigate("game/$gameId")
         }
         if (game.gameState == GameState.CANCELED.toString()) {
@@ -141,9 +136,7 @@ fun SetupScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Board setup") })
-        }
+        topBar = { TopAppBar(title = { Text("Board setup") }) }
     ) { innerPadding ->
         Column(
             modifier = Modifier.padding(innerPadding).fillMaxSize(),
@@ -151,12 +144,10 @@ fun SetupScreen(
         ) {
             Text(text = "Arrange Your Ships", fontSize = 25.sp)
             Spacer(modifier = Modifier.height(12.dp))
+
             Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
                 val dragMutableState = remember { mutableStateOf(DragState()) }
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(GRID_SIZE),
-                    modifier = Modifier.matchParentSize()
-                ) {
+                LazyVerticalGrid(columns = GridCells.Fixed(GRID_SIZE), modifier = Modifier.matchParentSize()) {
                     itemsIndexed((1..GRID_SIZE).flatMap { row ->
                         (0 until GRID_SIZE).map { colIndex ->
                             val col = ('A'.code + colIndex).toChar().toString()
@@ -164,31 +155,20 @@ fun SetupScreen(
                         }
                     }) { _, coordinate ->
                         val occupyingShip = ships.find { ship -> ship.cells.any { it.coordinate == coordinate } }
-
-                        GridCell(
-                            occupyingShip,
-                            coordinate,
-                            onShipMoved,
-                            onShipClicked,
-                            dragMutableState
-                        )
+                        GridCell(occupyingShip, coordinate, onShipMoved, onShipClicked, dragMutableState)
                     }
                 }
             }
+
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onReady,
-                enabled = !isReadyPressed
-            ) {
+            Button(onClick = onReady, enabled = !isReadyPressed) {
                 Text(text = "Ready")
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Button(
-                onClick = { showLeaveDialog = true },
-                enabled = !isReadyPressed
-            ) {
+            Button(onClick = { showLeaveDialog = true }, enabled = !isReadyPressed) {
                 Text(text = "Leave game")
             }
+
             when (game.gameState) {
                 GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby...")
                 GameState.SETTING_SHIPS.toString() -> {
@@ -201,17 +181,16 @@ fun SetupScreen(
                 else -> {}
             }
         }
+
         if (showLeaveDialog) {
             AlertDialog(
                 onDismissRequest = { showLeaveDialog = false },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            model.removePlayerAndCheckGameDeletion(gameId, model.localPlayerId.value)
-                            showLeaveDialog = false
-                            navController.navigate("lobby")
-                        }
-                    ) {
+                    Button(onClick = {
+                        model.removePlayerAndCheckGameDeletion(gameId, model.localPlayerId.value)
+                        showLeaveDialog = false
+                        navController.navigate("lobby")
+                    }) {
                         Text("Leave")
                     }
                 },

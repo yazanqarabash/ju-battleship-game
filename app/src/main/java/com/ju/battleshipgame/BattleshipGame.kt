@@ -42,7 +42,7 @@ fun BattleshipGame() {
                 )
         }
 
-        composable("boardSetup/{gameId}") { backStackEntry ->
+        composable("Setup/{gameId}") { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId")
             SetupScreen(
                 navController = navController,
