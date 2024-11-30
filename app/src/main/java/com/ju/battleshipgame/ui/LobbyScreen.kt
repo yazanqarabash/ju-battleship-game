@@ -17,7 +17,6 @@ import com.ju.battleshipgame.GameViewModel
 import com.ju.battleshipgame.models.Game
 import com.ju.battleshipgame.models.GamePlayer
 import kotlinx.coroutines.flow.asStateFlow
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LobbyScreen(navController: NavController, model: GameViewModel) {
@@ -26,14 +25,15 @@ fun LobbyScreen(navController: NavController, model: GameViewModel) {
 
     LaunchedEffect(games) {
         games.forEach { (gameId, game) ->
+            // Här kollar vi om spelaren är en av spelarna i spelet och om spelet är pågående
             if (game.players.any { it.playerId == model.localPlayerId.value }) {
-                if (game.gameState == "GAME_IN_PROGRESS" && game.currentPlayerId == model.localPlayerId.value) {
+                if (game.gameState == "GAME_IN_PROGRESS") {
+                    // När spelet är i "GAME_IN_PROGRESS", navigera till setup-skärmen för båda spelarna
                     navController.navigate("setup/$gameId")
                 }
             }
         }
     }
-
 
     LazyColumn(modifier = Modifier.padding(16.dp)) {
         items(players.entries.toList()) { (documentId, player) ->
@@ -63,6 +63,7 @@ fun LobbyScreen(navController: NavController, model: GameViewModel) {
                                                 "currentPlayerId", model.localPlayerId.value
                                             )
                                             .addOnSuccessListener {
+                                                // När utmaningen accepteras, navigera både till SetupScreen för den som accepterar och utmanaren.
                                                 navController.navigate("setup/$gameId")
                                             }
                                             .addOnFailureListener {
@@ -71,7 +72,6 @@ fun LobbyScreen(navController: NavController, model: GameViewModel) {
                                     }) {
                                         Text("Accept invite")
                                     }
-
                                 }
                                 hasGame = true
                             }
@@ -95,13 +95,11 @@ fun LobbyScreen(navController: NavController, model: GameViewModel) {
                                     .addOnFailureListener { e ->
                                         Log.e("LobbyScreen", "Error creating game: ${e.message}")
                                     }
-
                             }) {
                                 Text("Challenge")
                             }
                         }
                     }
-
                 )
             }
         }

@@ -93,20 +93,14 @@ fun SetupScreen(
     }
 
     LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
+        // Kontrollera om båda spelarna är redo
         if (gamePlayer.isReady && opponent.isReady) {
+            // Uppdatera spelets tillstånd och navigera till game screen
             model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
+            model.updateCurrentPlayer(gameId, game.players.first().playerId)
 
-            // Uppdatera currentPlayerId så den som bjudit in spelet får börja spela
-            val firstPlayer = game.players.firstOrNull { it.player.name == model.localPlayerId.value }
-            if (firstPlayer != null) {
-                model.updateCurrentPlayer(gameId, firstPlayer.player.name)
-                Log.d("SetupScreen", "First player set to: ${firstPlayer.player.name}")
-            }
-
+            // Navigera till GameScreen när båda är redo
             navController.navigate("game/$gameId")
-        }
-        if (game.gameState == GameState.CANCELED.toString()) {
-            navController.navigate("lobby")
         }
     }
 
@@ -170,41 +164,13 @@ fun SetupScreen(
             }
 
             when (game.gameState) {
-                GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby...")
-                GameState.SETTING_SHIPS.toString() -> {
-                    when {
-                        gamePlayer.isReady && opponent.isReady -> Text("Game is starting!")
-                        gamePlayer.isReady -> Text("Waiting for opponent to be ready...")
-                        opponent.isReady -> Text("Opponent is ready and waiting!")
-                    }
-                }
-                else -> {}
+                GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby.")
+                GameState.FINISHED.toString() -> Text("Game finished.")
             }
-        }
-
-        if (showLeaveDialog) {
-            AlertDialog(
-                onDismissRequest = { showLeaveDialog = false },
-                confirmButton = {
-                    Button(onClick = {
-                        model.removePlayerAndCheckGameDeletion(gameId, model.localPlayerId.value)
-                        showLeaveDialog = false
-                        navController.navigate("lobby")
-                    }) {
-                        Text("Leave")
-                    }
-                },
-                dismissButton = {
-                    Button(onClick = { showLeaveDialog = false }) {
-                        Text("Cancel")
-                    }
-                },
-                title = { Text("Leave Game") },
-                text = { Text("Are you sure you want to leave? Leaving can't be undone.") }
-            )
         }
     }
 }
+
 
 @Composable
 fun GridCell(
