@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.ju.battleshipgame.GameViewModel
+import com.ju.battleshipgame.models.DEFAULT_PLAYER_SHIPS
 import com.ju.battleshipgame.models.Game
 import com.ju.battleshipgame.models.GamePlayer
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,8 +84,8 @@ fun LobbyScreen(navController: NavController, model: GameViewModel) {
                                         Game(
                                             gameState = "invite",
                                             players = listOf(
-                                                GamePlayer(playerId = model.localPlayerId.value!!, player = players[model.localPlayerId.value]!!),
-                                                GamePlayer(playerId = documentId, player = player)
+                                                GamePlayer(playerId = model.localPlayerId.value!!, player = players[model.localPlayerId.value]!!, playerShips = DEFAULT_PLAYER_SHIPS, isReady = false),
+                                                GamePlayer(playerId = documentId, player = player, playerShips = DEFAULT_PLAYER_SHIPS, isReady = false )
                                             ),
                                             currentPlayerId = ""
                                         )

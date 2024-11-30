@@ -2,8 +2,8 @@ package com.ju.battleshipgame
 
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
+import androidx.navigation.NavController
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.ju.battleshipgame.models.Game
@@ -15,11 +15,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 open class GameViewModel: ViewModel() {
     val db = Firebase.firestore
+
     // TODO take localPlayerId from sharedpreferences
     var localPlayerId = mutableStateOf<String?>(null)
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
-    val inviteMap =  MutableStateFlow<Map<String, Invite>>(emptyMap())
+    val inviteMap = MutableStateFlow<Map<String, Invite>>(emptyMap())
 
 
     fun initGame() {
@@ -27,7 +28,7 @@ open class GameViewModel: ViewModel() {
         db.collection("players")
             .addSnapshotListener { value, error ->
                 if (error != null) {
-                    Log.e("GameViewModel", "Error fetching players: ${error.message}") // ÄNDRING
+                    Log.e("GameViewModel", "Error fetching players: ${error.message}")
                     return@addSnapshotListener
                 }
                 if (value != null) {
@@ -36,9 +37,9 @@ open class GameViewModel: ViewModel() {
                             doc.id to doc.toObject(Player::class.java)!!
                         }
                         playerMap.value = updatedMap
-                        Log.d("GameViewModel", "Fetched players: $updatedMap") // ÄNDRING
+                        Log.d("GameViewModel", "Fetched players: $updatedMap")
                     } catch (e: Exception) {
-                        Log.e("GameViewModel", "Error processing player data: ${e.message}") // ÄNDRING
+                        Log.e("GameViewModel", "Error processing player data: ${e.message}")
                     }
                 }
             }
@@ -79,7 +80,12 @@ open class GameViewModel: ViewModel() {
         db.collection("games").document(gameId).update("currentPlayer", newState)
     }
 
-    fun updatePlayerReadyState(gameId: String, playerId: String, ships: List<Ship>, isReady: Boolean) {
+    fun updatePlayerReadyState(
+        gameId: String,
+        playerId: String,
+        ships: List<Ship>,
+        isReady: Boolean
+    ) {
         db.collection("games").document(gameId).get()
             .addOnSuccessListener { document ->
                 val game = document.toObject(Game::class.java)
@@ -103,40 +109,50 @@ open class GameViewModel: ViewModel() {
                 Log.e("FirebaseFetch", "Failed to fetch game: ${e.message}")
             }
     }
+
     // TODO test if leaving game is working properly
-    fun removePlayerAndCheckGameDeletion(gameId: String, playerName: String?) {
+    fun removePlayerAndCheckGameDeletion(
+        gameId: String,
+        playerName: String?,
+        navController: NavController
+    ) {
         val game = gameMap.value[gameId] ?: return
-
         val remainingPlayers = game.players.filter { it.player.name != playerName }
-
-        if (remainingPlayers.isEmpty()) {
-            db.collection("games").document(gameId)
+        Log.d ("Deleting", "There are " + remainingPlayers.size + " players ")
+            Log.d("Deleting", "Trying to delete " + gameId)
+            db.collection("games")
+                    .document(gameId)
                 .delete()
                 .addOnSuccessListener {
                     Log.d("GameViewModel", "Game deleted successfully")
+                    navController.navigate("lobby") {
+                        popUpTo("lobby") { inclusive = true }
+                    }
                 }
                 .addOnFailureListener { e ->
                     Log.e("GameViewModel", "Error deleting game: ${e.message}")
+                    e.printStackTrace()
                 }
-        } else {
-            if (game.gameState == GameState.SETTING_SHIPS.toString()) {
-                db.collection("games").document(gameId)
-                    .update("gameState", GameState.CANCELED)
-                    .addOnSuccessListener {
-                        Log.d("GameViewModel", "Game marked as canceled")
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("GameViewModel", "Error updating game state: ${e.message}")
-                    }
-            }
             db.collection("games").document(gameId)
-                .update("players", remainingPlayers)
+                .update(
+                    mapOf(
+                        "players" to remainingPlayers,
+                        "gameState" to GameState.CANCELED.toString(),
+                        "message" to "$playerName has left the game."
+                    )
+                )
                 .addOnSuccessListener {
-                    Log.d("GameViewModel", "Player removed successfully")
+                    Log.d("GameViewModel", "Player removed and game updated successfully")
+                    navController.navigate("lobby") {
+                        popUpTo("lobby") { inclusive = true }
+                    }
                 }
                 .addOnFailureListener { e ->
-                    Log.e("GameViewModel", "Error removing player: ${e.message}")
+
+                    Log.e("GameViewModel", "Error updating game: ${e.message}")
+                    e.printStackTrace()
                 }
-        }
+
     }
+
 }

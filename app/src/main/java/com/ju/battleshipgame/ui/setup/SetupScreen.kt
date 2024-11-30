@@ -1,6 +1,7 @@
 package com.ju.battleshipgame.ui.setup
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,19 +64,19 @@ fun SetupScreen(
     navController: NavController,
     gameId: String?,
     model: GameViewModel
+
 ) {
     var isReadyPressed by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
-
+    var isWaiting by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
 
+    // Error handling if the gameId is invalid or game not found
     if (gameId == null || !games.containsKey(gameId)) {
-        Log.e("SetupError", "Error: Game not found: $gameId")
-        Text("Error: Game not found: $gameId")
-        Spacer(Modifier.height(12.dp))
-        IconButton(onClick = { navController.navigate("lobby") }) {
-            Icon(Icons.Filled.Clear, contentDescription = "Leave")
-        }
+        navController.navigate("lobby")
+        Toast.makeText(context, "The other player left the game ", Toast.LENGTH_SHORT).show()
+
         return
     }
 
@@ -82,6 +84,7 @@ fun SetupScreen(
     val gamePlayer = game.players.find { it.playerId == model.localPlayerId.value }
     val opponent = game.players.find { it.playerId != model.localPlayerId.value }
 
+    // Handle error if player or opponent is missing
     if (gamePlayer == null || opponent == null) {
         Log.e("SetupError", "Error: Player not found!")
         Text("Error: Player not found!")
@@ -93,19 +96,16 @@ fun SetupScreen(
     }
 
     LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
-        // Kontrollera om båda spelarna är redo
         if (gamePlayer.isReady && opponent.isReady) {
-            // Uppdatera spelets tillstånd och navigera till game screen
             model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
             model.updateCurrentPlayer(gameId, game.players.first().playerId)
-
-            // Navigera till GameScreen när båda är redo
             navController.navigate("game/$gameId")
         }
     }
 
     var ships by remember { mutableStateOf(gamePlayer.playerShips) }
 
+    // Ship movement and placement handling
     val onShipMoved: (Ship, Coordinate) -> Unit = { movedShip, newCoordinate ->
         val newCells = calculateShipPlacement(newCoordinate, movedShip.length, movedShip.orientation)
         ships = updateShipIfValid(movedShip, newCells, movedShip.orientation, ships)
@@ -123,10 +123,15 @@ fun SetupScreen(
 
     val onReady: () -> Unit = {
         isReadyPressed = true
+        isWaiting = true // Aktivera vänteläget
         gamePlayer.playerShips = ships
         gamePlayer.isReady = true
-
         model.updatePlayerReadyState(gameId, gamePlayer.player.name, ships, true)
+    }
+
+    val onLeaveGame: () -> Unit = {
+        Log.d("SetupScreen", "Leave button clicked")
+        showLeaveDialog = true // Show dialog when Leave button is clicked
     }
 
     Scaffold(
@@ -141,38 +146,86 @@ fun SetupScreen(
 
             Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
                 val dragMutableState = remember { mutableStateOf(DragState()) }
-                LazyVerticalGrid(columns = GridCells.Fixed(GRID_SIZE), modifier = Modifier.matchParentSize()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(GRID_SIZE),
+                    modifier = Modifier.matchParentSize()
+                ) {
                     itemsIndexed((1..GRID_SIZE).flatMap { row ->
                         (0 until GRID_SIZE).map { colIndex ->
                             val col = ('A'.code + colIndex).toChar().toString()
                             Coordinate(col, row)
                         }
                     }) { _, coordinate ->
-                        val occupyingShip = ships.find { ship -> ship.cells.any { it.coordinate == coordinate } }
-                        GridCell(occupyingShip, coordinate, onShipMoved, onShipClicked, dragMutableState)
+                        val occupyingShip = ships.find { ship ->
+                            ship.cells.any { it.coordinate == coordinate }
+                        }
+                        GridCell(
+                            occupyingShip,
+                            coordinate,
+                            onShipMoved,
+                            onShipClicked,
+                            dragMutableState
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            // "Ready"-knapp och statusmeddelande
             Button(onClick = onReady, enabled = !isReadyPressed) {
-                Text(text = "Ready")
+                Text(text = if (isWaiting) "Waiting for another player..." else "Ready")
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Button(onClick = { showLeaveDialog = true }, enabled = !isReadyPressed) {
+
+            // Knapp för att lämna spelet
+            Button(onClick = onLeaveGame) {
                 Text(text = "Leave game")
             }
 
+            // Visar statusmeddelande för spelets tillstånd
             when (game.gameState) {
                 GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby.")
                 GameState.FINISHED.toString() -> Text("Game finished.")
             }
         }
     }
+
+    // Leave confirmation dialog
+    if (showLeaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveDialog = false },
+            title = { Text("Are you sure you want to leave the game?") },
+            text = { Text("Both players will be returned to the lobby and the game will be deleted.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        model.localPlayerId.value?.let {
+                            model.removePlayerAndCheckGameDeletion(
+                                gameId,
+                                it,
+                                navController = navController
+                            )
+                        }
+                        showLeaveDialog = false
+                        navController.navigate("lobby") {
+                            popUpTo("game/$gameId") { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showLeaveDialog = false }) {
+                    Text("No")
+                }
+            }
+        )
+    }
 }
 
-
-@Composable
+ @Composable
 fun GridCell(
     occupyingShip: Ship?,
     coordinate: Coordinate,
