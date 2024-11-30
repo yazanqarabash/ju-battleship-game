@@ -72,12 +72,26 @@ open class GameViewModel: ViewModel() {
             }
     }
 
-    fun updateGameState(gameId: String, newState: GameState) {
-        db.collection("games").document(gameId).update("gameState", newState)
+    fun updateGameState(gameId: String, gameState: GameState) {
+        db.collection("games").document(gameId)
+            .update("gameState", gameState.toString())
+            .addOnSuccessListener {
+                Log.d("FirebaseUpdate", "Game state updated: $gameState")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FirebaseUpdate", "Failed to update game state: ${e.message}")
+            }
     }
 
-    fun updateCurrentPlayer(gameId: String, newState: String) {
-        db.collection("games").document(gameId).update("currentPlayer", newState)
+    fun updateCurrentPlayer(gameId: String, currentPlayerId: String) {
+        db.collection("games").document(gameId)
+            .update("currentPlayerId", currentPlayerId)
+            .addOnSuccessListener {
+                Log.d("FirebaseUpdate", "Current player updated: $currentPlayerId")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FirebaseUpdate", "Failed to update current player: ${e.message}")
+            }
     }
 
     fun updatePlayerReadyState(
@@ -90,25 +104,34 @@ open class GameViewModel: ViewModel() {
             .addOnSuccessListener { document ->
                 val game = document.toObject(Game::class.java)
                 game?.let {
-                    val updatedPlayers = it.players.map { player ->
-                        if (player.playerId == playerId) {
-                            player.copy(playerShips = ships, isReady = isReady)
-                        } else player
+                    // Find the player and check if the ready state has changed
+                    val player = it.players.find { player -> player.playerId == playerId }
+                    if (player != null && player.isReady!= isReady) {
+                        // Update the player readiness state and ships if it's different
+                        val updatedPlayers = it.players.map { gamePlayer ->
+                            if (gamePlayer.playerId == playerId) {
+                                gamePlayer.copy(playerShips = ships, isReady = isReady)
+                            } else gamePlayer
+                        }
+                        db.collection("games").document(gameId)
+                            .update("players", updatedPlayers)
+                            .addOnSuccessListener {
+                                Log.d("FirebaseUpdate", "Player state updated: $playerId")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("FirebaseUpdate", "Failed to update player state: ${e.message}")
+                            }
+                    } else {
+                        Log.d("FirebaseUpdate", "No changes detected for player $playerId")
                     }
-                    db.collection("games").document(gameId)
-                        .update("players", updatedPlayers)
-                        .addOnSuccessListener {
-                            Log.d("FirebaseUpdate", "Player state updated: $playerId")
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e("FirebaseUpdate", "Failed to update player state: ${e.message}")
-                        }
                 }
             }
             .addOnFailureListener { e ->
                 Log.e("FirebaseFetch", "Failed to fetch game: ${e.message}")
             }
     }
+
+
 
     // TODO test if leaving game is working properly
     fun removePlayerAndCheckGameDeletion(

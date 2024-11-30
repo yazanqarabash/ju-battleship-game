@@ -53,9 +53,6 @@ fun GameScreen(
         }
         return
     }
-
-
-    // Hantera spelets tillstånd och spelarnas beredskap
     LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
         // Om båda spelarna är redo, starta spelet
         if (gamePlayer.isReady && opponent.isReady) {

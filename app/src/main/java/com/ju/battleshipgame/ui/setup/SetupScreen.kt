@@ -57,14 +57,12 @@ import kotlinx.coroutines.flow.asStateFlow
 
 private const val GRID_SIZE = 10
 private val CELL_SIZE_DP = 32.dp
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetupScreen(
     navController: NavController,
     gameId: String?,
     model: GameViewModel
-
 ) {
     var isReadyPressed by remember { mutableStateOf(false) }
     var showLeaveDialog by remember { mutableStateOf(false) }
@@ -76,7 +74,6 @@ fun SetupScreen(
     if (gameId == null || !games.containsKey(gameId)) {
         navController.navigate("lobby")
         Toast.makeText(context, "The other player left the game ", Toast.LENGTH_SHORT).show()
-
         return
     }
 
@@ -95,7 +92,8 @@ fun SetupScreen(
         return
     }
 
-    LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
+    // Check if both players are ready, then update game state and navigate
+    LaunchedEffect(gamePlayer.isReady, opponent.isReady) {
         if (gamePlayer.isReady && opponent.isReady) {
             model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
             model.updateCurrentPlayer(gameId, game.players.first().playerId)
@@ -122,11 +120,13 @@ fun SetupScreen(
     }
 
     val onReady: () -> Unit = {
-        isReadyPressed = true
-        isWaiting = true // Aktivera vänteläget
-        gamePlayer.playerShips = ships
-        gamePlayer.isReady = true
-        model.updatePlayerReadyState(gameId, gamePlayer.player.name, ships, true)
+        if (!gamePlayer.isReady) {  // Only update if the player is not already ready
+            isReadyPressed = true
+            isWaiting = true // Activate waiting state
+            gamePlayer.playerShips = ships
+            gamePlayer.isReady = true
+            model.updatePlayerReadyState(gameId, gamePlayer.playerId, ships, true)
+        }
     }
 
     val onLeaveGame: () -> Unit = {
