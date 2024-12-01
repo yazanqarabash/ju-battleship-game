@@ -92,15 +92,17 @@ fun SetupScreen(
         return
     }
 
-    // Check if both players are ready, then update game state and navigate
     LaunchedEffect(gamePlayer.isReady, opponent.isReady) {
-        if (gamePlayer.isReady && opponent.isReady) {
+        // Only navigate to the game screen once both players are ready and the game is not already in progress
+        if (gamePlayer.isReady && opponent.isReady ) {
+            // Update game state to in-progress only once
             model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
             model.updateCurrentPlayer(gameId, game.players.first().playerId)
+
+            // Wait for the state to update before navigating
             navController.navigate("game/$gameId")
         }
     }
-
     var ships by remember { mutableStateOf(gamePlayer.playerShips) }
 
     // Ship movement and placement handling
@@ -120,14 +122,15 @@ fun SetupScreen(
     }
 
     val onReady: () -> Unit = {
-        if (!gamePlayer.isReady) {  // Only update if the player is not already ready
+        if (!gamePlayer.isReady) {
             isReadyPressed = true
-            isWaiting = true // Activate waiting state
+            isWaiting = true
             gamePlayer.playerShips = ships
             gamePlayer.isReady = true
             model.updatePlayerReadyState(gameId, gamePlayer.playerId, ships, true)
         }
     }
+
 
     val onLeaveGame: () -> Unit = {
         Log.d("SetupScreen", "Leave button clicked")
@@ -178,12 +181,11 @@ fun SetupScreen(
             }
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Knapp för att lämna spelet
+
             Button(onClick = onLeaveGame) {
                 Text(text = "Leave game")
             }
 
-            // Visar statusmeddelande för spelets tillstånd
             when (game.gameState) {
                 GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby.")
                 GameState.FINISHED.toString() -> Text("Game finished.")

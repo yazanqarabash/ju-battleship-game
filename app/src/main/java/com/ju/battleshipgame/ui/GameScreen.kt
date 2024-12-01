@@ -29,6 +29,7 @@ fun GameScreen(
     val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
     val game = games[gameId]
 
+    // Ensure gameId is valid
     if (gameId == null || game == null) {
         Log.e("GameScreen", "Error: Game not found: $gameId")
         Text("Error: Game not found: $gameId")
@@ -39,11 +40,9 @@ fun GameScreen(
         return
     }
 
-    // Hitta spelaren och motståndaren baserat på lokal spelare
     val gamePlayer = game.players.find { it.playerId == model.localPlayerId.value }
     val opponent = game.players.find { it.playerId != model.localPlayerId.value }
 
-    // Om spelaren eller motståndaren inte finns
     if (gamePlayer == null || opponent == null) {
         Log.e("GameScreen", "Error: Player not found!")
         Text("Error: Player not found!")
@@ -53,14 +52,15 @@ fun GameScreen(
         }
         return
     }
+
     LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
-        // Om båda spelarna är redo, starta spelet
-        if (gamePlayer.isReady && opponent.isReady) {
+        if (gamePlayer.isReady && opponent.isReady && game.gameState != GameState.GAME_IN_PROGRESS.toString()) {
             model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
             model.updateCurrentPlayer(gameId, gamePlayer.player.name)
             navController.navigate("game/$gameId")
         }
-        // Om spelet är avbrutet, gå tillbaka till lobby
+
+        // Handle canceled game state
         if (game.gameState == GameState.CANCELED.toString()) {
             navController.navigate("lobby")
         }
