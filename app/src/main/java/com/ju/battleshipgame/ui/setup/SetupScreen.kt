@@ -2,6 +2,7 @@ package com.ju.battleshipgame.ui.setup
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,13 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.ju.battleshipgame.GameViewModel
+import com.ju.battleshipgame.R
 import com.ju.battleshipgame.calculateOccupyingShipOffset
 import com.ju.battleshipgame.calculatePotentialCells
 import com.ju.battleshipgame.calculateShipPlacement
@@ -131,99 +135,126 @@ fun SetupScreen(
         }
     }
 
-
     val onLeaveGame: () -> Unit = {
         Log.d("SetupScreen", "Leave button clicked")
         showLeaveDialog = true // Show dialog when Leave button is clicked
     }
 
+    // Scaffold with background image and layout
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Board setup") }) }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier.padding(innerPadding).fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = "Arrange Your Ships", fontSize = 25.sp)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
-                val dragMutableState = remember { mutableStateOf(DragState()) }
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(GRID_SIZE),
-                    modifier = Modifier.matchParentSize()
-                ) {
-                    itemsIndexed((1..GRID_SIZE).flatMap { row ->
-                        (0 until GRID_SIZE).map { colIndex ->
-                            val col = ('A'.code + colIndex).toChar().toString()
-                            Coordinate(col, row)
-                        }
-                    }) { _, coordinate ->
-                        val occupyingShip = ships.find { ship ->
-                            ship.cells.any { it.coordinate == coordinate }
-                        }
-                        GridCell(
-                            occupyingShip,
-                            coordinate,
-                            onShipMoved,
-                            onShipClicked,
-                            dragMutableState
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // "Ready"-knapp och statusmeddelande
-            Button(onClick = onReady, enabled = !isReadyPressed) {
-                Text(text = if (isWaiting) "Waiting for another player..." else "Ready")
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-
-
-            Button(onClick = onLeaveGame) {
-                Text(text = "Leave game")
-            }
-
-            when (game.gameState) {
-                GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby.")
-                GameState.FINISHED.toString() -> Text("Game finished.")
-            }
+        topBar = {
+            TopAppBar(
+                title = { Text("Board setup") },
+                colors = androidx.compose.material3.TopAppBarDefaults.centerAlignedTopAppBarColors()
+            )
         }
-    }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Gray) // Optional fallback color in case of image loading issue
+        ) {
+            // Add the background image
+            Image(
+                painter = painterResource(id = R.drawable.img),
+                contentDescription = "Background Image",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop // Crop or fit the image
+            )
 
-    // Leave confirmation dialog
-    if (showLeaveDialog) {
-        AlertDialog(
-            onDismissRequest = { showLeaveDialog = false },
-            title = { Text("Are you sure you want to leave the game?") },
-            text = { Text("Both players will be returned to the lobby and the game will be deleted.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        model.localPlayerId.value?.let {
-                            model.removePlayerAndCheckGameDeletion(
-                                gameId,
-                                it,
-                                navController = navController
+            // Content layout
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = 0.7f)) // Slight opacity to contrast text
+                ,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Arrange Your Ships",
+                    fontSize = 25.sp,
+                    color = Color.Black // Adjust text color for better contrast with background
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
+                    val dragMutableState = remember { mutableStateOf(DragState()) }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(GRID_SIZE),
+                        modifier = Modifier.matchParentSize()
+                    ) {
+                        itemsIndexed((1..GRID_SIZE).flatMap { row ->
+                            (0 until GRID_SIZE).map { colIndex ->
+                                val col = ('A'.code + colIndex).toChar().toString()
+                                Coordinate(col, row)
+                            }
+                        }) { _, coordinate ->
+                            val occupyingShip = ships.find { ship ->
+                                ship.cells.any { it.coordinate == coordinate }
+                            }
+                            GridCell(
+                                occupyingShip,
+                                coordinate,
+                                onShipMoved,
+                                onShipClicked,
+                                dragMutableState
                             )
                         }
-                        showLeaveDialog = false
-                        navController.navigate("lobby") {
-                            popUpTo("game/$gameId") { inclusive = true }
-                        }
                     }
-                ) {
-                    Text("Yes")
                 }
-            },
-            dismissButton = {
-                Button(onClick = { showLeaveDialog = false }) {
-                    Text("No")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // "Ready"-knapp och statusmeddelande
+                Button(onClick = onReady, enabled = !isReadyPressed) {
+                    Text(text = if (isWaiting) "Waiting for another player..." else "Ready")
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Button(onClick = onLeaveGame) {
+                    Text(text = "Leave game")
+                }
+
+                when (game.gameState) {
+                    GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby.")
+                    GameState.FINISHED.toString() -> Text("Game finished.")
                 }
             }
-        )
+
+            // Leave confirmation dialog
+            if (showLeaveDialog) {
+                AlertDialog(
+                    onDismissRequest = { showLeaveDialog = false },
+                    title = { Text("Are you sure you want to leave the game?") },
+                    text = { Text("Both players will be returned to the lobby and the game will be deleted.") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                model.localPlayerId.value?.let {
+                                    model.removePlayerAndCheckGameDeletion(
+                                        gameId,
+                                        it,
+                                        navController = navController
+                                    )
+                                }
+                                showLeaveDialog = false
+                                navController.navigate("lobby") {
+                                    popUpTo("game/$gameId") { inclusive = true }
+                                }
+                            }
+                        ) {
+                            Text("Yes")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showLeaveDialog = false }) {
+                            Text("No")
+                        }
+                    }
+                )
+            }
+        }
     }
 }
 

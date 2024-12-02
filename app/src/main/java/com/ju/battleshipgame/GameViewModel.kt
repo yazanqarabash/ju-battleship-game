@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.navigation.NavController
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
+import com.ju.battleshipgame.models.Cell
 import com.ju.battleshipgame.models.Game
 import com.ju.battleshipgame.models.GameState
 import com.ju.battleshipgame.models.Invite
@@ -193,5 +194,85 @@ open class GameViewModel: ViewModel() {
             "Unknown Player"
         }
     }
+    fun makeMove(gameId: String, playerId: String, targetCell: Cell) {
+        db.collection("games").document(gameId).get()
+            .addOnSuccessListener { document ->
+                val game = document.toObject(Game::class.java)
+                if (game != null) {
+                    // Kontrollera att det är spelarens tur
+                    if (game.currentPlayerId == playerId) {
+                        val opponent = game.players.find { it.playerId != playerId }
+                        val currentPlayer = game.players.find { it.playerId == playerId }
+
+                        if (opponent != null && currentPlayer != null) {
+                            val hit = opponent.playerShips.any { ship ->
+                                ship.cells.any { cell -> cell.coordinate == targetCell.coordinate }
+                            }
+
+                            // Uppdatera träff eller miss
+                            if (hit) {
+                                val updatedShips = opponent.playerShips.map { ship ->
+                                    ship.copy(
+                                        cells = ship.cells.map { cell ->
+                                            if (cell.coordinate == targetCell.coordinate) {
+                                                cell.hit() // Markera cellen som träffad
+                                            } else {
+                                                cell
+                                            }
+                                        }
+                                    )
+                                }
+
+                                // Uppdatera motståndarens data med träffar
+                                val updatedOpponent = opponent.copy(
+                                    playerShips = updatedShips
+                                )
+
+                                game.players = game.players.map {
+                                    if (it.playerId == opponent.playerId) updatedOpponent else it
+                                }
+                            } else {
+                                // Uppdatera motståndarens data med missade skott
+                                val updatedShots = opponent.shotsFired + targetCell.coordinate
+                                val updatedOpponent = opponent.copy(
+                                    shotsFired = updatedShots
+                                )
+
+                                game.players = game.players.map {
+                                    if (it.playerId == opponent.playerId) updatedOpponent else it
+                                }
+                            }
+
+                            // Byt spelare för nästa omgång
+                            val nextPlayerId = game.players.first { it.playerId != playerId }.playerId
+
+                            // Förbered uppdateringar till Firebase
+                            val updates = mapOf(
+                                "players" to game.players,
+                                "currentPlayerId" to nextPlayerId,
+                                "gameState" to GameState.GAME_IN_PROGRESS.toString()
+                            )
+
+                            // Uppdatera Firebase med den nya spelstatusen
+                            db.collection("games").document(gameId).update(updates)
+                                .addOnSuccessListener {
+                                    Log.d("GameViewModel", "Move processed successfully.")
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("GameViewModel", "Failed to update game state: ${e.message}")
+                                }
+                        }
+                    } else {
+                        Log.w("GameViewModel", "Not the player's turn!")
+                    }
+                } else {
+                    Log.e("GameViewModel", "Game not found in database!")
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("GameViewModel", "Failed to fetch game: ${e.message}")
+            }
+    }
+
 
 }

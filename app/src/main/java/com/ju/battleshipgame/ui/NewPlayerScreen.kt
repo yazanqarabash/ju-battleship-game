@@ -46,7 +46,7 @@ fun NewPlayerScreen(
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.battleship_home),
+            painter = painterResource(id = R.drawable.lobby),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
