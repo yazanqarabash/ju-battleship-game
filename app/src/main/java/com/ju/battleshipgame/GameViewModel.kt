@@ -7,6 +7,7 @@ import androidx.navigation.NavController
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.ju.battleshipgame.models.Cell
+import com.ju.battleshipgame.models.Coordinate
 import com.ju.battleshipgame.models.Game
 import com.ju.battleshipgame.models.GameState
 import com.ju.battleshipgame.models.Invite
@@ -129,7 +130,10 @@ open class GameViewModel: ViewModel() {
                                 Log.d("FirebaseUpdate", "Player state updated: $playerId")
                             }
                             .addOnFailureListener { e ->
-                                Log.e("FirebaseUpdate", "Failed to update player state: ${e.message}")
+                                Log.e(
+                                    "FirebaseUpdate",
+                                    "Failed to update player state: ${e.message}"
+                                )
                             }
                     }
                 }
@@ -140,8 +144,6 @@ open class GameViewModel: ViewModel() {
     }
 
 
-
-
     // TODO test if leaving game is working properly
     fun removePlayerAndCheckGameDeletion(
         gameId: String,
@@ -150,42 +152,43 @@ open class GameViewModel: ViewModel() {
     ) {
         val game = gameMap.value[gameId] ?: return
         val remainingPlayers = game.players.filter { it.player.name != playerName }
-        Log.d ("Deleting", "There are " + remainingPlayers.size + " players ")
-            Log.d("Deleting", "Trying to delete " + gameId)
-            db.collection("games")
-                    .document(gameId)
-                .delete()
-                .addOnSuccessListener {
-                    Log.d("GameViewModel", "Game deleted successfully")
-                    navController.navigate("lobby") {
-                        popUpTo("lobby") { inclusive = true }
-                    }
+        Log.d("Deleting", "There are " + remainingPlayers.size + " players ")
+        Log.d("Deleting", "Trying to delete " + gameId)
+        db.collection("games")
+            .document(gameId)
+            .delete()
+            .addOnSuccessListener {
+                Log.d("GameViewModel", "Game deleted successfully")
+                navController.navigate("lobby") {
+                    popUpTo("lobby") { inclusive = true }
                 }
-                .addOnFailureListener { e ->
-                    Log.e("GameViewModel", "Error deleting game: ${e.message}")
-                    e.printStackTrace()
-                }
-            db.collection("games").document(gameId)
-                .update(
-                    mapOf(
-                        "players" to remainingPlayers,
-                        "gameState" to GameState.CANCELED.toString(),
-                        "message" to "$playerName has left the game."
-                    )
+            }
+            .addOnFailureListener { e ->
+                Log.e("GameViewModel", "Error deleting game: ${e.message}")
+                e.printStackTrace()
+            }
+        db.collection("games").document(gameId)
+            .update(
+                mapOf(
+                    "players" to remainingPlayers,
+                    "gameState" to GameState.CANCELED.toString(),
+                    "message" to "$playerName has left the game."
                 )
-                .addOnSuccessListener {
-                    Log.d("GameViewModel", "Player removed and game updated successfully")
-                    navController.navigate("lobby") {
-                        popUpTo("lobby") { inclusive = true }
-                    }
+            )
+            .addOnSuccessListener {
+                Log.d("GameViewModel", "Player removed and game updated successfully")
+                navController.navigate("lobby") {
+                    popUpTo("lobby") { inclusive = true }
                 }
-                .addOnFailureListener { e ->
+            }
+            .addOnFailureListener { e ->
 
-                    Log.e("GameViewModel", "Error updating game: ${e.message}")
-                    e.printStackTrace()
-                }
+                Log.e("GameViewModel", "Error updating game: ${e.message}")
+                e.printStackTrace()
+            }
 
     }
+
     fun getLocalPlayerName(): String {
         val localId = localPlayerId.value
         return if (localId != null) {
@@ -199,19 +202,20 @@ open class GameViewModel: ViewModel() {
             .addOnSuccessListener { document ->
                 val game = document.toObject(Game::class.java)
                 if (game != null) {
-                    // Kontrollera att det är spelarens tur
+                    // Kontrollera om det är spelarens tur
                     if (game.currentPlayerId == playerId) {
                         val opponent = game.players.find { it.playerId != playerId }
-                        val currentPlayer = game.players.find { it.playerId == playerId }
-
-                        if (opponent != null && currentPlayer != null) {
-                            val hit = opponent.playerShips.any { ship ->
+                        opponent?.let {
+                            val hit = it.playerShips.any { ship ->
                                 ship.cells.any { cell -> cell.coordinate == targetCell.coordinate }
                             }
 
+                            val updates = mutableMapOf<String, Any>()
+
                             // Uppdatera träff eller miss
                             if (hit) {
-                                val updatedShips = opponent.playerShips.map { ship ->
+                                // Om det är en träff, markera cellen som träffad
+                                val updatedOpponentShips = it.playerShips.map { ship ->
                                     ship.copy(
                                         cells = ship.cells.map { cell ->
                                             if (cell.coordinate == targetCell.coordinate) {
@@ -223,50 +227,51 @@ open class GameViewModel: ViewModel() {
                                     )
                                 }
 
-                                // Uppdatera motståndarens data med träffar
-                                val updatedOpponent = opponent.copy(
-                                    playerShips = updatedShips
-                                )
+                                // Uppdatera spelarens hits
+                                val updatedHits = it.hits + targetCell.coordinate
 
-                                game.players = game.players.map {
-                                    if (it.playerId == opponent.playerId) updatedOpponent else it
+                                // Uppdatera den motståndande spelarens data
+                                it.playerShips = updatedOpponentShips
+                                it.hits = updatedHits
+
+                                // Kontrollera om motståndaren har förlorat alla skepp
+                                if (it.playerShips.all { ship -> ship.cells.all { it.wasHit } }) {
+                                    // Om alla skepp är förstörda, sätt vinnaren
+                                    val winner = game.players.find { p -> p.playerId == playerId }
+                                    winner?.let {
+                                        updates["winner"] = it
+                                    }
+                                    updates["gameState"] = GameState.FINISHED.toString()
+                                } else {
+                                    updates["gameState"] = GameState.GAME_IN_PROGRESS.toString()
                                 }
+
+                                // Behåll spelarens tur
+                                updates["currentPlayerId"] = playerId
                             } else {
-                                // Uppdatera motståndarens data med missade skott
-                                val updatedShots = opponent.shotsFired + targetCell.coordinate
-                                val updatedOpponent = opponent.copy(
-                                    shotsFired = updatedShots
-                                )
+                                // Om det är en miss, lägg till det i skjutna koordinater och byt tur
+                                val updatedShotsFired = it.shotsFired + targetCell.coordinate
+                                it.shotsFired = updatedShotsFired
 
-                                game.players = game.players.map {
-                                    if (it.playerId == opponent.playerId) updatedOpponent else it
-                                }
+                                // Byt tur till nästa spelare
+                                val nextPlayerId = game.players.find { p -> p.playerId != playerId }?.playerId
+                                updates["currentPlayerId"] = nextPlayerId ?: playerId
                             }
 
-                            // Byt spelare för nästa omgång
-                            val nextPlayerId = game.players.first { it.playerId != playerId }.playerId
+                            // Uppdatera spelarlistan och spelets status
+                            updates["players"] = game.players
 
-                            // Förbered uppdateringar till Firebase
-                            val updates = mapOf(
-                                "players" to game.players,
-                                "currentPlayerId" to nextPlayerId,
-                                "gameState" to GameState.GAME_IN_PROGRESS.toString()
-                            )
-
-                            // Uppdatera Firebase med den nya spelstatusen
-                            db.collection("games").document(gameId).update(updates)
+                            // Spara uppdateringarna i Firebase
+                            db.collection("games").document(gameId)
+                                .update(updates)
                                 .addOnSuccessListener {
-                                    Log.d("GameViewModel", "Move processed successfully.")
+                                    Log.d("GameViewModel", "Move processed.")
                                 }
                                 .addOnFailureListener { e ->
                                     Log.e("GameViewModel", "Failed to update game state: ${e.message}")
                                 }
                         }
-                    } else {
-                        Log.w("GameViewModel", "Not the player's turn!")
                     }
-                } else {
-                    Log.e("GameViewModel", "Game not found in database!")
                 }
             }
             .addOnFailureListener { e ->

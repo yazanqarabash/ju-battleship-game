@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -50,27 +51,55 @@ fun GameScreen(
     val context = LocalContext.current
     val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
 
+    // Om spelet inte finns eller om gameId är null, navigera tillbaka till lobbyn
     if (gameId == null || !games.containsKey(gameId)) {
         navController.navigate("lobby")
         Toast.makeText(context, "Game not found!", Toast.LENGTH_SHORT).show()
         return
     }
 
+    // Hämta spelet och lokala spelaren
     val game = games[gameId]!!
     val localPlayer = game.players.find { it.playerId == model.localPlayerId.value }
     val opponent = game.players.find { it.playerId != model.localPlayerId.value }
 
+    // Om ingen av spelarna hittas, navigera tillbaka till lobbyn
     if (localPlayer == null || opponent == null) {
         Log.e("GameError", "Player or opponent not found!")
         navController.navigate("lobby")
         return
     }
 
+    // Kolla om den aktuella spelaren är den som har sin tur
     val isCurrentPlayer = game.currentPlayerId == localPlayer.playerId
+
+    // Hämta motståndarens träffar och missade skott
     val opponentHits = opponent.playerShips.flatMap { ship ->
         ship.cells.filter { it.wasHit }.map { it.coordinate }
     }
     val missedShots = opponent.shotsFired
+
+    // Hämta vinnare och förlorare baserat på playerId
+    val winner = game.winner
+    val loser = game.players.find { it.playerId != winner?.playerId }
+
+    // Om det finns en vinnare, visa en Toast och färga vinnaren och förloraren
+    if (winner != null) {
+        // If winner is a Player object, use winner.name directly
+        Toast.makeText(
+            context,
+            "Congratulations, ${winner.name}, you won!",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        loser?.let {
+            Text(
+                "${it.player.name} has lost the game.",
+                fontSize = 24.sp,
+                color = Color.Red // Färga förlorarens namn röd
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -86,6 +115,39 @@ fun GameScreen(
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Om spelet är slut, visa vinnaren och förloraren
+            winner?.let {
+                Text(
+                    "Congratulations, ${it.name}, you won!",
+                    fontSize = 24.sp,
+                    color = Color.Green
+                )
+
+                loser?.let {
+                    Text(
+                        "${it.player.name} has lost the game.",
+                        fontSize = 24.sp,
+                        color = Color.Red
+                    )
+                }
+
+                // Knapp för att gå tillbaka till lobby
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        navController.navigate("lobby") {
+                            popUpTo("game") { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Back to Lobby")
+                }
+
+                return@Column
+            }
+
+            // Visa motståndarens bräda
             Text("Opponent's Board", fontSize = 20.sp)
             Board(
                 gridSize = GRID_SIZE,
@@ -116,6 +178,7 @@ fun GameScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Visa spelarens bräda
             Text("Your Board", fontSize = 20.sp)
             Board(
                 gridSize = GRID_SIZE,
@@ -127,6 +190,8 @@ fun GameScreen(
     }
 }
 
+
+
 @Composable
 fun Board(
     gridSize: Int,
@@ -136,6 +201,8 @@ fun Board(
     hits: List<Coordinate> = emptyList(),
     misses: List<Coordinate> = emptyList()
 ) {
+    val missedCoordinates = remember { mutableStateListOf<Coordinate>() }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
         modifier = Modifier.size(CELL_SIZE_DP * gridSize)
@@ -147,18 +214,21 @@ fun Board(
             }
         }) { _, coordinate ->
 
-            // Logik för att hitta skepp och status
             val occupyingShip = ships?.find { ship ->
                 ship.cells.any { cell -> cell.coordinate == coordinate }
             }
 
-            // Färglogik
             val cellColor = when {
-                isOpponentBoard && hits.contains(coordinate) -> Color.Red
-                isOpponentBoard && misses.contains(coordinate) -> Color.LightGray
-                !isOpponentBoard && occupyingShip != null && occupyingShip.cells.any { it.coordinate == coordinate && it.wasHit } -> Color.Red
-                !isOpponentBoard && occupyingShip != null -> Color.Blue
-                else -> Color.White
+                isOpponentBoard -> when {
+                    hits.contains(coordinate) -> Color.Red
+                    misses.contains(coordinate) -> Color.LightGray
+                    else -> Color.White
+                }
+                else -> when {
+                    occupyingShip != null && occupyingShip.cells.any { it.coordinate == coordinate && it.wasHit } -> Color.Red
+                    occupyingShip != null -> Color.Blue
+                    else -> Color.White
+                }
             }
 
             Box(
@@ -173,8 +243,6 @@ fun Board(
         }
     }
 }
-
-
 
 
 
