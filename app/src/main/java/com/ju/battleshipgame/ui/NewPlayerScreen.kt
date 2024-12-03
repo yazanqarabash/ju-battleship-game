@@ -1,4 +1,5 @@
 package com.ju.battleshipgame.ui.home
+
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -33,9 +34,9 @@ import androidx.compose.ui.platform.LocalContext
 fun NewPlayerScreen(
     navController: NavHostController,
     model: GameViewModel,
-    onPlayerCreated: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // todo sharedpreferences
     val context = LocalContext.current
     var playerName by remember { mutableStateOf("") }
     val db = FirebaseFirestore.getInstance()
@@ -72,7 +73,6 @@ fun NewPlayerScreen(
                         .addOnSuccessListener { documentRef ->
                             model.localPlayerId.value = documentRef.id
                             Log.d("NewPlayerScreen", "Player added successfully: $playerName")
-                            onPlayerCreated(playerName)
                             navController.navigate("lobby")
                         }
                         .addOnFailureListener { e ->

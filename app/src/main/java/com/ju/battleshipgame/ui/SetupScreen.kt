@@ -1,4 +1,4 @@
-package com.ju.battleshipgame.ui.setup
+package com.ju.battleshipgame.ui
 
 import android.util.Log
 import android.widget.Toast
@@ -107,6 +107,7 @@ fun SetupScreen(
             navController.navigate("game/$gameId")
         }
     }
+
     var ships by remember { mutableStateOf(gamePlayer.playerShips) }
 
     // Ship movement and placement handling

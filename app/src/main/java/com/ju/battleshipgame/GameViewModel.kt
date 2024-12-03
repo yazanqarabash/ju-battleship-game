@@ -10,7 +10,6 @@ import com.ju.battleshipgame.models.Cell
 import com.ju.battleshipgame.models.Coordinate
 import com.ju.battleshipgame.models.Game
 import com.ju.battleshipgame.models.GameState
-import com.ju.battleshipgame.models.Invite
 import com.ju.battleshipgame.models.Player
 import com.ju.battleshipgame.models.Ship
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +21,6 @@ open class GameViewModel: ViewModel() {
     var localPlayerId = mutableStateOf<String?>(null)
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
-    val inviteMap = MutableStateFlow<Map<String, Invite>>(emptyMap())
 
 
     fun initGame() {
@@ -43,20 +41,6 @@ open class GameViewModel: ViewModel() {
                     } catch (e: Exception) {
                         Log.e("GameViewModel", "Error processing player data: ${e.message}")
                     }
-                }
-            }
-
-        // Listen for invite
-        db.collection("invites")
-            .addSnapshotListener { value, error ->
-                if (error != null) {
-                    return@addSnapshotListener
-                }
-                if (value != null) {
-                    val updatedMap = value.documents.associate { doc ->
-                        doc.id to doc.toObject(Invite::class.java)!!
-                    }
-                    inviteMap.value = updatedMap
                 }
             }
         // Listen for games
@@ -197,6 +181,7 @@ open class GameViewModel: ViewModel() {
             "Unknown Player"
         }
     }
+
     fun makeMove(gameId: String, playerId: String, targetCell: Cell) {
         db.collection("games").document(gameId).get()
             .addOnSuccessListener { document ->

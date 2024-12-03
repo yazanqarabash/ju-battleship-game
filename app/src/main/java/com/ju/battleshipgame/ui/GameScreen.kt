@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 private const val GRID_SIZE = 10
 private val CELL_SIZE_DP = 32.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameScreen(
@@ -71,7 +72,7 @@ fun GameScreen(
     }
 
     // Kolla om den aktuella spelaren är den som har sin tur
-    val isCurrentPlayer = game.currentPlayerId == localPlayer.playerId
+    var currentPlayer = game.players.find { it.playerId == game.currentPlayerId }
 
     // Hämta motståndarens träffar och missade skott
     val opponentHits = opponent.playerShips.flatMap { ship ->
@@ -88,7 +89,7 @@ fun GameScreen(
         // If winner is a Player object, use winner.name directly
         Toast.makeText(
             context,
-            "Congratulations, ${winner.name}, you won!",
+            "Congratulations, ${winner.player.name}, you won!",
             Toast.LENGTH_SHORT
         ).show()
 
@@ -104,7 +105,7 @@ fun GameScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Battleships - Your Turn: ${if (isCurrentPlayer) "Yes" else "No"}") },
+                title = { Text("Battleships - Your Turn: ${currentPlayer?.player?.name}") },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors()
             )
         }
@@ -118,7 +119,7 @@ fun GameScreen(
             // Om spelet är slut, visa vinnaren och förloraren
             winner?.let {
                 Text(
-                    "Congratulations, ${it.name}, you won!",
+                    "Congratulations, ${it.player.name}, you won!",
                     fontSize = 24.sp,
                     color = Color.Green
                 )
@@ -153,7 +154,7 @@ fun GameScreen(
                 gridSize = GRID_SIZE,
                 ships = null, // Inga skepp eftersom det är motståndarens bräda
                 onCellClick = { coordinate ->
-                    if (isCurrentPlayer) {
+                    if (currentPlayer != null) {
                         val targetCell = Cell(coordinate)
 
                         if (targetCell.wasHit || coordinate in missedShots) {
@@ -243,54 +244,3 @@ fun Board(
         }
     }
 }
-
-
-
-/*@Composable
-fun GameScreen(
-    navController: NavController,
-    gameId: String?,
-    model: GameViewModel
-) {
-
-    val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
-    val game = games[gameId]
-
-    // Ensure gameId is valid
-    if (gameId == null || game == null) {
-        Log.e("GameScreen", "Error: Game not found: $gameId")
-        Text("Error: Game not found: $gameId")
-        Spacer(Modifier.height(12.dp))
-        IconButton(onClick = { navController.navigate("lobby") }) {
-            Icon(Icons.Filled.Clear, contentDescription = "Leave")
-        }
-        return
-    }
-
-    val gamePlayer = game.players.find { it.playerId == model.localPlayerId.value }
-    val opponent = game.players.find { it.playerId != model.localPlayerId.value }
-
-    if (gamePlayer == null || opponent == null) {
-        Log.e("GameScreen", "Error: Player not found!")
-        Text("Error: Player not found!")
-        Spacer(Modifier.height(12.dp))
-        IconButton(onClick = { navController.navigate("lobby") }) {
-            Icon(Icons.Filled.Clear, contentDescription = "Leave")
-        }
-        return
-    }
-
-    LaunchedEffect(gamePlayer.isReady, opponent.isReady, game.gameState) {
-        if (gamePlayer.isReady && opponent.isReady && game.gameState != GameState.GAME_IN_PROGRESS.toString()) {
-            model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
-            model.updateCurrentPlayer(gameId, gamePlayer.player.name)
-            navController.navigate("game/$gameId")
-        }
-
-        // Handle canceled game state
-        if (game.gameState == GameState.CANCELED.toString()) {
-            navController.navigate("lobby")
-        }
-    }
-}
-*/

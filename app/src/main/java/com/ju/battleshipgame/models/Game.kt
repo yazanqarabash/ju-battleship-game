@@ -3,7 +3,7 @@ package com.ju.battleshipgame.models
 data class Game(
     var players: List<GamePlayer> = emptyList(), // Byter från player1Id och player2Id till en lista av spelare.
     var currentPlayerId: String = "",           // Identifierar den aktuella spelarens ID.
-    var winner: Player? = null,                 // Vinnare om spelet är avslutat.
+    var winner: GamePlayer? = null,                 // Vinnare om spelet är avslutat.
     var gameState: String = GameState.SETTING_SHIPS.toString()
 )
 
