@@ -5,7 +5,13 @@ import androidx.compose.ui.geometry.Offset
 data class Cell(
     val coordinate: Coordinate = Coordinate("A", 1),
     val wasHit: Boolean = false
-)
+) {
+
+    fun hit(): Cell {//jag har addat den här funk
+        return this.copy(wasHit = true)
+    }
+}
+
 
 data class Coordinate(val col: String = "A", val row: Int = 1) {
 
