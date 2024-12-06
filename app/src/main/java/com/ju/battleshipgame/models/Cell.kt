@@ -6,8 +6,7 @@ data class Cell(
     val coordinate: Coordinate = Coordinate("A", 1),
     val wasHit: Boolean = false
 ) {
-
-    fun hit(): Cell {//jag har addat den här funk
+    fun hit(): Cell {
         return this.copy(wasHit = true)
     }
 }

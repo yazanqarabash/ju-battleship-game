@@ -1,19 +1,19 @@
 package com.ju.battleshipgame.models
 
 data class Game(
-    var players: List<GamePlayer> = emptyList(), // Byter från player1Id och player2Id till en lista av spelare.
-    var currentPlayerId: String = "",           // Identifierar den aktuella spelarens ID.
-    var winner: GamePlayer? = null,                 // Vinnare om spelet är avslutat.
+    var players: List<GamePlayer> = emptyList(),
+    var currentPlayerId: String = "",
+    var winner: GamePlayer? = null,
     var gameState: String = GameState.SETTING_SHIPS.toString()
 )
 
 data class GamePlayer(
-    val playerId: String = "",                  // Varje spelare har ett unikt ID.
+    val playerId: String = "",
     val player: Player = Player(),
     var playerShips: List<Ship> = emptyList(),
     var isReady: Boolean = false,
-    var shotsFired: List<Coordinate> = emptyList(),  // jag
-    var hits: List<Coordinate> = emptyList() // jag
+    var shotsFired: List<Coordinate> = emptyList(),
+    var hits: List<Coordinate> = emptyList()
 )
 
 

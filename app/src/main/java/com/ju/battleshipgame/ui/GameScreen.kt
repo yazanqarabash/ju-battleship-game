@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -15,8 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.SentimentDissatisfied
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -24,18 +30,24 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.ju.battleshipgame.GameViewModel
+import com.ju.battleshipgame.R
 import com.ju.battleshipgame.models.Cell
 import com.ju.battleshipgame.models.Coordinate
+import com.ju.battleshipgame.models.GamePlayer
+import com.ju.battleshipgame.models.GameState
 import com.ju.battleshipgame.models.Ship
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -52,60 +64,49 @@ fun GameScreen(
     val context = LocalContext.current
     val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
 
-    // Om spelet inte finns eller om gameId är null, navigera tillbaka till lobbyn
     if (gameId == null || !games.containsKey(gameId)) {
-        navController.navigate("lobby")
         Toast.makeText(context, "Game not found!", Toast.LENGTH_SHORT).show()
+        navController.navigate("lobby")
         return
     }
 
-    // Hämta spelet och lokala spelaren
     val game = games[gameId]!!
     val localPlayer = game.players.find { it.playerId == model.localPlayerId.value }
     val opponent = game.players.find { it.playerId != model.localPlayerId.value }
 
-    // Om ingen av spelarna hittas, navigera tillbaka till lobbyn
     if (localPlayer == null || opponent == null) {
-        Log.e("GameError", "Player or opponent not found!")
+        Toast.makeText(context, "Player or opponent not found!", Toast.LENGTH_SHORT).show()
         navController.navigate("lobby")
         return
     }
 
-    // Kolla om den aktuella spelaren är den som har sin tur
-    var currentPlayer = game.players.find { it.playerId == game.currentPlayerId }
+    val currentPlayer = game.players.find { it.playerId == game.currentPlayerId }
 
-    // Hämta motståndarens träffar och missade skott
     val opponentHits = opponent.playerShips.flatMap { ship ->
         ship.cells.filter { it.wasHit }.map { it.coordinate }
     }
+
     val missedShots = opponent.shotsFired
 
-    // Hämta vinnare och förlorare baserat på playerId
-    val winner = game.winner
-    val loser = game.players.find { it.playerId != winner?.playerId }
-
-    // Om det finns en vinnare, visa en Toast och färga vinnaren och förloraren
-    if (winner != null) {
-        // If winner is a Player object, use winner.name directly
-        Toast.makeText(
-            context,
-            "Congratulations, ${winner.player.name}, you won!",
-            Toast.LENGTH_SHORT
-        ).show()
-
-        loser?.let {
-            Text(
-                "${it.player.name} has lost the game.",
-                fontSize = 24.sp,
-                color = Color.Red // Färga förlorarens namn röd
-            )
+    val opponentMisses = localPlayer.shotsFired.filterNot { fired ->
+        opponent.playerShips.any { ship ->
+            ship.cells.any { cell -> cell.coordinate == fired }
         }
     }
+
+    val winner = game.winner
+    val loser = game.players.find { it.playerId != winner?.playerId }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Battleships - Your Turn: ${currentPlayer?.player?.name}") },
+                title = {
+                    if (game.gameState == GameState.FINISHED.toString()) {
+                        Text("Battleships - Game Finished")
+                    } else {
+                        Text("Battleships - ${currentPlayer?.player?.name}'s Turn")
+                    }
+                },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors()
             )
         }
@@ -116,43 +117,15 @@ fun GameScreen(
                 .padding(innerPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Om spelet är slut, visa vinnaren och förloraren
             winner?.let {
-                Text(
-                    "Congratulations, ${it.player.name}, you won!",
-                    fontSize = 24.sp,
-                    color = Color.Green
-                )
-
-                loser?.let {
-                    Text(
-                        "${it.player.name} has lost the game.",
-                        fontSize = 24.sp,
-                        color = Color.Red
-                    )
-                }
-
-                // Knapp för att gå tillbaka till lobby
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        navController.navigate("lobby") {
-                            popUpTo("game") { inclusive = true }
-                        }
-                    }
-                ) {
-                    Text("Back to Lobby")
-                }
-
+                GameResult(winner = it, loser = loser, navController = navController)
                 return@Column
             }
-
-            // Visa motståndarens bräda
             Text("Opponent's Board", fontSize = 20.sp)
+            Spacer(modifier = Modifier.height(4.dp))
             Board(
                 gridSize = GRID_SIZE,
-                ships = null, // Inga skepp eftersom det är motståndarens bräda
+                ships = opponent.playerShips,
                 onCellClick = { coordinate ->
                     if (currentPlayer != null) {
                         val targetCell = Cell(coordinate)
@@ -172,26 +145,23 @@ fun GameScreen(
                         Toast.makeText(context, "Wait for your turn", Toast.LENGTH_SHORT).show()
                     }
                 },
-                isOpponentBoard = true, // Markera att detta är motståndarens bräda
+                isOpponentBoard = true,
                 hits = opponentHits,
                 misses = missedShots
             )
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Visa spelarens bräda
             Text("Your Board", fontSize = 20.sp)
+            Spacer(modifier = Modifier.height(4.dp))
             Board(
                 gridSize = GRID_SIZE,
-                ships = localPlayer.playerShips, // Dina skepp visas här
+                ships = localPlayer.playerShips,
                 onCellClick = null,
-                isOpponentBoard = false // Markera att detta är spelarens bräda
+                isOpponentBoard = false,
+                misses = opponentMisses
             )
         }
     }
 }
-
-
 
 @Composable
 fun Board(
@@ -202,8 +172,6 @@ fun Board(
     hits: List<Coordinate> = emptyList(),
     misses: List<Coordinate> = emptyList()
 ) {
-    val missedCoordinates = remember { mutableStateListOf<Coordinate>() }
-
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridSize),
         modifier = Modifier.size(CELL_SIZE_DP * gridSize)
@@ -221,17 +189,19 @@ fun Board(
 
             val cellColor = when {
                 isOpponentBoard -> when {
+                    occupyingShip != null && occupyingShip.isSunk -> Color.Black
                     hits.contains(coordinate) -> Color.Red
                     misses.contains(coordinate) -> Color.LightGray
                     else -> Color.White
                 }
                 else -> when {
+                    occupyingShip != null && occupyingShip.isSunk -> Color.Black
                     occupyingShip != null && occupyingShip.cells.any { it.coordinate == coordinate && it.wasHit } -> Color.Red
                     occupyingShip != null -> Color.Blue
+                    misses.contains(coordinate) -> Color.LightGray
                     else -> Color.White
                 }
             }
-
             Box(
                 modifier = Modifier
                     .size(CELL_SIZE_DP)
@@ -241,6 +211,71 @@ fun Board(
                         onCellClick?.invoke(coordinate)
                     }
             )
+        }
+    }
+}
+
+@Composable
+fun GameResult(
+    winner: GamePlayer?,
+    loser: GamePlayer?,
+    navController: NavController
+) {
+    if (winner != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.EmojiEvents,
+                contentDescription = "Winner Trophy",
+                tint = Color.Black,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "🎉 Congratulations! 🎉",
+                fontSize = 28.sp,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "${winner.player.name} has won the game!",
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            loser?.let {
+                Spacer(modifier = Modifier.height(16.dp))
+                Icon(
+                    imageVector = Icons.Filled.SentimentDissatisfied,
+                    contentDescription = "Sad Face",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${it.player.name} has lost the game.",
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(
+                onClick = {
+                    navController.navigate("lobby") {
+                        popUpTo("game") { inclusive = true }
+                    }
+                },
+                modifier = Modifier.padding(horizontal = 24.dp)
+            ) {
+                Text("Back to Lobby", style = MaterialTheme.typography.bodyLarge)
+            }
         }
     }
 }

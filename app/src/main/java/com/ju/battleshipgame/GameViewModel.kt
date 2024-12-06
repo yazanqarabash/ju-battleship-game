@@ -7,8 +7,9 @@ import androidx.navigation.NavController
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.ju.battleshipgame.models.Cell
-import com.ju.battleshipgame.models.Coordinate
+import com.ju.battleshipgame.models.DEFAULT_PLAYER_SHIPS
 import com.ju.battleshipgame.models.Game
+import com.ju.battleshipgame.models.GamePlayer
 import com.ju.battleshipgame.models.GameState
 import com.ju.battleshipgame.models.Player
 import com.ju.battleshipgame.models.Ship
@@ -16,8 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 open class GameViewModel: ViewModel() {
     val db = Firebase.firestore
-
-    // TODO take localPlayerId from sharedpreferences
     var localPlayerId = mutableStateOf<String?>(null)
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
@@ -28,19 +27,13 @@ open class GameViewModel: ViewModel() {
         db.collection("players")
             .addSnapshotListener { value, error ->
                 if (error != null) {
-                    Log.e("GameViewModel", "Error fetching players: ${error.message}")
                     return@addSnapshotListener
                 }
                 if (value != null) {
-                    try {
-                        val updatedMap = value.documents.associate { doc ->
-                            doc.id to doc.toObject(Player::class.java)!!
-                        }
-                        playerMap.value = updatedMap
-                        Log.d("GameViewModel", "Fetched players: $updatedMap")
-                    } catch (e: Exception) {
-                        Log.e("GameViewModel", "Error processing player data: ${e.message}")
+                    val updatedMap = value.documents.associate { doc ->
+                        doc.id to doc.toObject(Player::class.java)!!
                     }
+                    playerMap.value = updatedMap
                 }
             }
         // Listen for games
@@ -58,6 +51,73 @@ open class GameViewModel: ViewModel() {
             }
     }
 
+    fun addPlayer(playerName: String, onSuccess: (String) -> Unit, onFailure: () -> Unit) {
+        val newPlayer = Player(playerName)
+        db.collection("players")
+            .add(newPlayer)
+            .addOnSuccessListener { documentRef -> onSuccess(documentRef.id) }
+            .addOnFailureListener { error ->
+                Log.e(
+                    "NewPlayerScreen",
+                    "Error creating player: ${error.message}"
+                )
+                onFailure()
+            }
+    }
+
+    fun createGame(documentId: String) {
+        val newGame = Game(
+            gameState = GameState.INVITE.toString(),
+            players = listOf(
+                GamePlayer(
+                    playerId = localPlayerId.value!!,
+                    player = playerMap.value[localPlayerId.value]!!,
+                    playerShips = DEFAULT_PLAYER_SHIPS,
+                    isReady = false
+                ),
+                GamePlayer(
+                    playerId = documentId,
+                    player = playerMap.value[documentId]!!,
+                    playerShips = DEFAULT_PLAYER_SHIPS,
+                    isReady = false
+                )
+            ),
+            currentPlayerId = ""
+        )
+
+        db.collection("games")
+            .add(newGame)
+            .addOnSuccessListener {
+                return@addOnSuccessListener
+            }
+            .addOnFailureListener { error ->
+                Log.e("LobbyScreen", "Error creating game: ${error.message}")
+            }
+    }
+
+    fun startGame(gameId: String, onSuccess: () -> Unit) {
+        db.collection("games").document(gameId)
+            .update(
+                "gameState", GameState.SETTING_SHIPS.toString(),
+                "currentPlayerId", localPlayerId.value
+            )
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener {
+                Log.e("LobbyScreen", "Error updating game: $gameId")
+            }
+    }
+
+    fun deleteGame(gameId: String) {
+        db.collection("games").document(gameId)
+            .delete()
+            .addOnSuccessListener {
+                return@addOnSuccessListener
+            }
+            .addOnFailureListener {
+                Log.e("LobbyScreen", "Error declining game: ${it.message}")
+            }
+    }
+
     fun updateGameState(gameId: String, newState: GameState) {
         db.collection("games").document(gameId).get()
             .addOnSuccessListener { document ->
@@ -66,7 +126,7 @@ open class GameViewModel: ViewModel() {
                     db.collection("games").document(gameId)
                         .update("gameState", newState.toString())
                         .addOnSuccessListener {
-                            Log.d("FirebaseUpdate", "Game state updated to: $newState")
+                            return@addOnSuccessListener
                         }
                         .addOnFailureListener { e ->
                             Log.e("FirebaseUpdate", "Failed to update game state: ${e.message}")
@@ -77,7 +137,6 @@ open class GameViewModel: ViewModel() {
                 Log.e("FirebaseFetch", "Failed to fetch game: ${e.message}")
             }
     }
-
 
     fun updateCurrentPlayer(gameId: String, currentPlayerId: String) {
         db.collection("games").document(gameId)
@@ -127,8 +186,6 @@ open class GameViewModel: ViewModel() {
             }
     }
 
-
-    // TODO test if leaving game is working properly
     fun removePlayerAndCheckGameDeletion(
         gameId: String,
         playerName: String?,
@@ -201,15 +258,15 @@ open class GameViewModel: ViewModel() {
                             if (hit) {
                                 // Om det är en träff, markera cellen som träffad
                                 val updatedOpponentShips = it.playerShips.map { ship ->
-                                    ship.copy(
-                                        cells = ship.cells.map { cell ->
-                                            if (cell.coordinate == targetCell.coordinate) {
-                                                cell.hit() // Markera cellen som träffad
-                                            } else {
-                                                cell
-                                            }
+                                    val updatedCells = ship.cells.map { cell ->
+                                        if (cell.coordinate == targetCell.coordinate) {
+                                            cell.hit() // Markera cellen som träffad
+                                        } else {
+                                            cell
                                         }
-                                    )
+                                    }
+                                    val isSunk = updatedCells.all { cell -> cell.wasHit }
+                                    ship.copy(cells = updatedCells, isSunk = isSunk)
                                 }
 
                                 // Uppdatera spelarens hits
@@ -263,6 +320,4 @@ open class GameViewModel: ViewModel() {
                 Log.e("GameViewModel", "Failed to fetch game: ${e.message}")
             }
     }
-
-
 }

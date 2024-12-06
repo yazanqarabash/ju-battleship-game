@@ -2,7 +2,6 @@ package com.ju.battleshipgame.models
 
 import com.ju.battleshipgame.calculateShipPlacement
 
-// TODO use default ships when creating game
 val DEFAULT_PLAYER_SHIPS = listOf(
     Ship(
         ShipType.CARRIER, 4,

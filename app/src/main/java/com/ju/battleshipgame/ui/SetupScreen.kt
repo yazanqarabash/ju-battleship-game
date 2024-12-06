@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -58,9 +59,9 @@ import com.ju.battleshipgame.models.Ship
 import com.ju.battleshipgame.updateShipIfValid
 import kotlinx.coroutines.flow.asStateFlow
 
-
 private const val GRID_SIZE = 10
 private val CELL_SIZE_DP = 32.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetupScreen(
@@ -74,7 +75,6 @@ fun SetupScreen(
     val context = LocalContext.current
     val games by model.gameMap.asStateFlow().collectAsStateWithLifecycle()
 
-    // Error handling if the gameId is invalid or game not found
     if (gameId == null || !games.containsKey(gameId)) {
         navController.navigate("lobby")
         Toast.makeText(context, "The other player left the game ", Toast.LENGTH_SHORT).show()
@@ -85,7 +85,6 @@ fun SetupScreen(
     val gamePlayer = game.players.find { it.playerId == model.localPlayerId.value }
     val opponent = game.players.find { it.playerId != model.localPlayerId.value }
 
-    // Handle error if player or opponent is missing
     if (gamePlayer == null || opponent == null) {
         Log.e("SetupError", "Error: Player not found!")
         Text("Error: Player not found!")
@@ -96,21 +95,14 @@ fun SetupScreen(
         return
     }
 
-    LaunchedEffect(gamePlayer.isReady, opponent.isReady) {
-        // Only navigate to the game screen once both players are ready and the game is not already in progress
-        if (gamePlayer.isReady && opponent.isReady ) {
-            // Update game state to in-progress only once
-            model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
-            model.updateCurrentPlayer(gameId, game.players.first().playerId)
-
-            // Wait for the state to update before navigating
+    LaunchedEffect(game.gameState) {
+        if (game.gameState == GameState.GAME_IN_PROGRESS.toString()) {
             navController.navigate("game/$gameId")
         }
     }
 
     var ships by remember { mutableStateOf(gamePlayer.playerShips) }
 
-    // Ship movement and placement handling
     val onShipMoved: (Ship, Coordinate) -> Unit = { movedShip, newCoordinate ->
         val newCells = calculateShipPlacement(newCoordinate, movedShip.length, movedShip.orientation)
         ships = updateShipIfValid(movedShip, newCells, movedShip.orientation, ships)
@@ -133,15 +125,13 @@ fun SetupScreen(
             gamePlayer.playerShips = ships
             gamePlayer.isReady = true
             model.updatePlayerReadyState(gameId, gamePlayer.playerId, ships, true)
+            if (opponent.isReady) {
+                model.updateGameState(gameId, GameState.GAME_IN_PROGRESS)
+                model.updateCurrentPlayer(gameId, game.players.first().playerId)
+            }
         }
     }
 
-    val onLeaveGame: () -> Unit = {
-        Log.d("SetupScreen", "Leave button clicked")
-        showLeaveDialog = true // Show dialog when Leave button is clicked
-    }
-
-    // Scaffold with background image and layout
     Scaffold(
         topBar = {
             TopAppBar(
@@ -153,77 +143,47 @@ fun SetupScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Gray) // Optional fallback color in case of image loading issue
+                .padding(innerPadding)
         ) {
-            // Add the background image
             Image(
                 painter = painterResource(id = R.drawable.img),
                 contentDescription = "Background Image",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop // Crop or fit the image
+                contentScale = ContentScale.Crop
             )
-
-            // Content layout
             Column(
                 modifier = Modifier
-                    .padding(innerPadding)
+                    .padding(18.dp)
                     .fillMaxSize()
-                    .background(Color.White.copy(alpha = 0.7f)) // Slight opacity to contrast text
+                    .background(Color.White.copy(alpha = 0.7f))
                 ,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = "Arrange Your Ships",
                     fontSize = 25.sp,
-                    color = Color.Black // Adjust text color for better contrast with background
+                    color = Color.Black,
+                    modifier = Modifier.padding(vertical = 8.dp)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-
-                Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
-                    val dragMutableState = remember { mutableStateOf(DragState()) }
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(GRID_SIZE),
-                        modifier = Modifier.matchParentSize()
-                    ) {
-                        itemsIndexed((1..GRID_SIZE).flatMap { row ->
-                            (0 until GRID_SIZE).map { colIndex ->
-                                val col = ('A'.code + colIndex).toChar().toString()
-                                Coordinate(col, row)
-                            }
-                        }) { _, coordinate ->
-                            val occupyingShip = ships.find { ship ->
-                                ship.cells.any { it.coordinate == coordinate }
-                            }
-                            GridCell(
-                                occupyingShip,
-                                coordinate,
-                                onShipMoved,
-                                onShipClicked,
-                                dragMutableState
-                            )
-                        }
-                    }
-                }
-
+                ShipGrid(
+                    ships = ships,
+                    onShipMoved = onShipMoved,
+                    onShipClicked = onShipClicked
+                )
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // "Ready"-knapp och statusmeddelande
                 Button(onClick = onReady, enabled = !isReadyPressed) {
-                    Text(text = if (isWaiting) "Waiting for another player..." else "Ready")
+                    Text(text = if (isWaiting) "Waiting for other player..." else "Ready")
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-
-                Button(onClick = onLeaveGame) {
+                Button(onClick = { showLeaveDialog = true  }) {
                     Text(text = "Leave game")
                 }
-
                 when (game.gameState) {
                     GameState.CANCELED.toString() -> Text("Game has been canceled. Returning to lobby.")
                     GameState.FINISHED.toString() -> Text("Game finished.")
                 }
             }
-
-            // Leave confirmation dialog
             if (showLeaveDialog) {
                 AlertDialog(
                     onDismissRequest = { showLeaveDialog = false },
@@ -233,11 +193,7 @@ fun SetupScreen(
                         Button(
                             onClick = {
                                 model.localPlayerId.value?.let {
-                                    model.removePlayerAndCheckGameDeletion(
-                                        gameId,
-                                        it,
-                                        navController = navController
-                                    )
+                                    model.removePlayerAndCheckGameDeletion(gameId, it, navController = navController)
                                 }
                                 showLeaveDialog = false
                                 navController.navigate("lobby") {
@@ -253,6 +209,40 @@ fun SetupScreen(
                             Text("No")
                         }
                     }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ShipGrid(
+    ships: List<Ship>,
+    onShipMoved: (Ship, Coordinate) -> Unit,
+    onShipClicked: (Ship) -> Unit
+) {
+    val dragMutableState = remember { mutableStateOf(DragState()) }
+
+    Box(modifier = Modifier.size(CELL_SIZE_DP * GRID_SIZE)) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(GRID_SIZE),
+            modifier = Modifier.matchParentSize()
+        ) {
+            itemsIndexed((1..GRID_SIZE).flatMap { row ->
+                (0 until GRID_SIZE).map { colIndex ->
+                    val col = ('A'.code + colIndex).toChar().toString()
+                    Coordinate(col, row)
+                }
+            }) { _, coordinate ->
+                val occupyingShip = ships.find { ship ->
+                    ship.cells.any { it.coordinate == coordinate }
+                }
+                GridCell(
+                    occupyingShip,
+                    coordinate,
+                    onShipMoved,
+                    onShipClicked,
+                    dragMutableState
                 )
             }
         }
